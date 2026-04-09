@@ -1,0 +1,21 @@
+{
+    "name": "HoloCade.Editor",
+    "rootNamespace": "HoloCade.Editor",
+    "references": [
+        "HoloCade.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
+
+
+
