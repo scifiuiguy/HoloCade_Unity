@@ -30,10 +30,12 @@ if exist "C:\Program Files\Unity\Hub\Editor\6000.0.60f1\Editor\Unity.exe" (
     exit /b 1
 )
 
-REM Script sits next to package.json. This repository is package-only (no host Assets/).
-REM To compile, point PROJECT_PATH at a Unity project that embeds HoloCade (e.g. set manually or run from that project's copy of this script under Packages/com.ajcampbell.holocade/).
-set PROJECT_PATH=%~dp0
-set PROJECT_PATH=%PROJECT_PATH:~0,-1%
+REM Script lives under BuildTooling~/ — package root (package.json) is the parent folder.
+REM This repository is package-only (no host Assets/). To compile, point PROJECT_PATH at a Unity project that embeds HoloCade (e.g. set manually or run from that project's copy under Packages/com.ajcampbell.holocade/BuildTooling~/).
+set "SCRIPT_DIR=%~dp0"
+pushd "%SCRIPT_DIR%.." >nul 2>&1
+set "PROJECT_PATH=%CD%"
+popd >nul 2>&1
 
 echo Unity Path: %UNITY_PATH%
 echo Project Path: %PROJECT_PATH%

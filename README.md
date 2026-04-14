@@ -272,6 +272,8 @@ This repository **is the HoloCade package** (`package.json` at the repo root): t
 
 Dependencies resolve from HoloCade’s `package.json` when the package is added to a project.
 
+**Project window / tooling:** Optional shell and batch scripts (compile checks, dedicated-server launcher, version bump) live in **`BuildTooling~/`**. Folders whose names end with **`~`** are ignored by Unity’s Asset Database, so those files do not import into the Project window and do not log importer errors. This root **`README.md`** stays at the package root so it remains visible alongside `package.json` and imports as a normal text asset.
+
 For installation options and Git URLs, see the [Installation](#-installation) section below.
 
 </blockquote>
@@ -2931,14 +2933,14 @@ The AIFacemask experience (and optionally other multiplayer experiences) uses a 
 
 Use the provided launch scripts:
 
-**Windows:**
+**Windows** (from the HoloCade package folder, e.g. under `Packages/com.ajcampbell.holocade/`):
 ```batch
-LaunchDedicatedServer.bat -experience AIFacemask -port 7777 -maxplayers 4
+BuildTooling~\LaunchDedicatedServer.bat -experience AIFacemask -port 7777 -maxplayers 4
 ```
 
 **Linux:**
 ```bash
-./LaunchDedicatedServer.sh -experience AIFacemask -port 7777 -maxplayers 4
+./BuildTooling~/LaunchDedicatedServer.sh -experience AIFacemask -port 7777 -maxplayers 4
 ```
 
 ### **Option 2: Server Manager GUI (Recommended)**

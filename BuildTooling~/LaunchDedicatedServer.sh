@@ -41,9 +41,10 @@ echo "Port: $PORT"
 echo "Max Players: $MAX_PLAYERS"
 echo ""
 
-# Build path to server executable (Builds/ at repository root next to this script)
+# Builds/ lives at package root (parent of BuildTooling~/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVER_PATH="$SCRIPT_DIR/Builds/Server/HoloCade_UnityServer.x86_64"
+PACKAGE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SERVER_PATH="$PACKAGE_ROOT/Builds/Server/HoloCade_UnityServer.x86_64"
 
 # Check if server executable exists
 if [ ! -f "$SERVER_PATH" ]; then

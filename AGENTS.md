@@ -119,7 +119,7 @@ Claude has a custom automated compilation system for Unity projects to enable AI
 The system consists of three components:
 1. CompilationReporter.cs - Editor script that monitors compilation events
 2. CompilationReporterCLI.cs - Command-line interface for batch mode execution
-3. CompileProject_Silent.bat (Windows) / CompileProject.sh (Linux) - Batch scripts that orchestrate the workflow
+3. `BuildTooling~/CompileProject_Silent.bat` (Windows) — batch script that orchestrates the workflow (lives under a `~` folder so Unity does not import it)
 
 ### How It Works
 
@@ -143,7 +143,7 @@ The system consists of three components:
 ### Usage for Claude
 
 When you need to check Unity compilation without user intervention:
-1. Run: .\CompileProject_Silent.bat (Windows) or ./CompileProject.sh (Linux)
+1. Run: `.\BuildTooling~\CompileProject_Silent.bat` (Windows; run from the HoloCade package root, or invoke by full path)
 2. Wait for exit code (0 = success, 1 = failure)
 3. Read: Temp/CompilationErrors.log for structured error report
 4. Parse errors in format: [Type] file(line,column): message
@@ -154,9 +154,9 @@ When you need to check Unity compilation without user intervention:
 - CompilationReporter.cs - Auto-loads via [InitializeOnLoad]
 - CompilationReporterCLI.cs - Provides static CompileAndExit() method
 
-**Batch Scripts** (must be at Unity project root):
-- CompileProject_Silent.bat (Windows)
-- CompileProject.sh (Linux)
+**Batch scripts** (in `BuildTooling~/` next to `package.json`; package root should be the Unity `-projectPath` when compiling):
+- `CompileProject_Silent.bat` (Windows)
+- `CompileProject.bat` (Windows, verbose)
 
 ### Critical Implementation Notes
 

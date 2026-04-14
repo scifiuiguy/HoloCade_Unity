@@ -30,7 +30,7 @@ namespace HoloCade.Editor
     /// 
     /// **When is it used?**
     /// - During automated builds (CI/CD pipelines)
-    /// - When running CompileProject_Silent.bat script
+    /// - When running BuildTooling~/CompileProject_Silent.bat script
     /// - When AI assistants need to check compilation status
     /// - Any time Unity compiles scripts (normal editor usage)
     /// 

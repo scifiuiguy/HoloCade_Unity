@@ -14,10 +14,12 @@ if exist "C:\Program Files\Unity\Hub\Editor\6000.0.60f1\Editor\Unity.exe" (
     exit /b 1
 )
 
-REM Script sits next to package.json. This repository is package-only (no host Assets/).
+REM Script lives under BuildTooling~/ — package root (package.json) is the parent folder.
 REM To compile, point PROJECT_PATH at a Unity project that embeds HoloCade (see CompileProject.bat).
-set PROJECT_PATH=%~dp0
-set PROJECT_PATH=%PROJECT_PATH:~0,-1%
+set "SCRIPT_DIR=%~dp0"
+pushd "%SCRIPT_DIR%.." >nul 2>&1
+set "PROJECT_PATH=%CD%"
+popd >nul 2>&1
 
 REM Delete old report files to force fresh compilation check
 if exist "%PROJECT_PATH%\Temp\CompilationErrors.log" del "%PROJECT_PATH%\Temp\CompilationErrors.log"

@@ -4,9 +4,11 @@ REM Updates package.json and creates a git tag for the release
 
 setlocal EnableDelayedExpansion
 
-REM Script sits at repository root when this repo is the UPM package.
-set REPO_ROOT=%~dp0
-set REPO_ROOT=%REPO_ROOT:~0,-1%
+REM Script lives under BuildTooling~/ — package root is the parent folder.
+set "SCRIPT_DIR=%~dp0"
+pushd "%SCRIPT_DIR%.." >nul 2>&1
+set "REPO_ROOT=%CD%"
+popd >nul 2>&1
 
 echo ========================================
 echo HoloCade Version Release Helper
@@ -21,7 +23,7 @@ if "%VERSION%"=="" (
 
 echo.
 echo Step 1: Updating package.json version to %VERSION%...
-powershell -NoProfile -Command "$p = '%~dp0package.json'; $content = Get-Content -LiteralPath $p -Raw; $content = $content -replace '(\"version\":\s*\")([^\"]+)(\")', '$1%VERSION%$3'; Set-Content -LiteralPath $p -Value $content -NoNewline"
+powershell -NoProfile -Command "$p = '%REPO_ROOT%\package.json'; $content = Get-Content -LiteralPath $p -Raw; $content = $content -replace '(\"version\":\s*\")([^\"]+)(\")', '$1%VERSION%$3'; Set-Content -LiteralPath $p -Value $content -NoNewline"
 if %ERRORLEVEL% NEQ 0 (
     echo Error: Failed to update package.json
     exit /b 1

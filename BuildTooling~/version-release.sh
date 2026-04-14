@@ -4,10 +4,10 @@
 
 set -e
 
-# Script sits at repository root when this repo is the UPM package.
+# Script lives under BuildTooling~/ — package root is the parent folder.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$SCRIPT_DIR"
-PACKAGE_JSON="$SCRIPT_DIR/package.json"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PACKAGE_JSON="$REPO_ROOT/package.json"
 
 echo "========================================"
 echo "HoloCade Version Release Helper"

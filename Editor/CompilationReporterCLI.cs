@@ -17,7 +17,7 @@ namespace HoloCade.Editor
     /// requiring manual interaction with the Unity Editor.
     /// 
     /// **Why do I see console messages like "[HoloCade AUTO-COMPILE] CLI invoked"?**
-    /// These messages appear when you run CompileProject_Silent.bat or when an external tool
+    /// These messages appear when you run BuildTooling~/CompileProject_Silent.bat or when an external tool
     /// launches Unity in batch mode with the -executeMethod flag. This is normal automated behavior.
     /// 
     /// **What does it do?**
@@ -28,7 +28,7 @@ namespace HoloCade.Editor
     /// - Exits Unity automatically (batch script terminates the process)
     /// 
     /// **When is it used?**
-    /// - Running CompileProject_Silent.bat from command line
+    /// - Running BuildTooling~/CompileProject_Silent.bat from command line
     /// - CI/CD pipelines that need to check compilation status
     /// - Automated testing workflows
     /// - AI assistants checking for compilation errors
@@ -36,7 +36,7 @@ namespace HoloCade.Editor
     /// **How to use it manually:**
     /// Unity.exe -batchmode -nographics -projectPath "path/to/project" -executeMethod HoloCade.Editor.CompilationReporterCLI.CompileAndExit
     /// 
-    /// **Note:** The batch script (CompileProject_Silent.bat) handles Unity process management.
+    /// **Note:** The batch script (BuildTooling~/CompileProject_Silent.bat) handles Unity process management.
     /// You typically don't need to call this directly - use the batch script instead.
     /// 
     /// **For more information:**

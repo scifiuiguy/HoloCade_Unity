@@ -7,6 +7,12 @@ echo HoloCade Unity Dedicated Server Launcher
 echo ========================================
 echo.
 
+REM Package root (Builds/, package.json) — parent of BuildTooling~/
+set "SCRIPT_DIR=%~dp0"
+pushd "%SCRIPT_DIR%.." >nul 2>&1
+set "PACKAGE_ROOT=%CD%"
+popd >nul 2>&1
+
 REM Default configuration
 set EXPERIENCE_TYPE=AIFacemask
 set SCENE_NAME=HoloCadeScene
@@ -45,8 +51,8 @@ echo Port: %PORT%
 echo Max Players: %MAX_PLAYERS%
 echo.
 
-REM Build path to server executable (Builds/ at repository root next to this script)
-set SERVER_PATH="%~dp0Builds\Server\HoloCade_UnityServer.exe"
+REM Builds/ lives at package root (parent of BuildTooling~/)
+set SERVER_PATH="%PACKAGE_ROOT%\Builds\Server\HoloCade_UnityServer.exe"
 
 REM Check if server executable exists
 if not exist %SERVER_PATH% (

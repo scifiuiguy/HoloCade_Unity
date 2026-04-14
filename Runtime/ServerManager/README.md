@@ -172,14 +172,14 @@ void AddLogMessage(const FString& Message);
 
 For quick testing without the GUI, use the provided batch script:
 
-**Windows:**
+**Windows** (from the HoloCade package root):
 ```batch
-LaunchDedicatedServer.bat -experience AIFacemask -port 7777 -maxplayers 4
+BuildTooling~\LaunchDedicatedServer.bat -experience AIFacemask -port 7777 -maxplayers 4
 ```
 
 **Linux:**
 ```bash
-./LaunchDedicatedServer.sh -experience AIFacemask -port 7777 -maxplayers 4
+./BuildTooling~/LaunchDedicatedServer.sh -experience AIFacemask -port 7777 -maxplayers 4
 ```
 
 ## Extending the Server Manager
