@@ -2,7 +2,12 @@
 REM HoloCade Version Release Script
 REM Updates package.json and creates a git tag for the release
 
-setlocal
+setlocal EnableDelayedExpansion
+
+REM Script lives in Packages/com.ajcampbell.holocade/ — repo root is two levels up
+pushd "%~dp0..\.."
+set REPO_ROOT=%CD%
+popd
 
 echo ========================================
 echo HoloCade Version Release Helper
@@ -17,7 +22,7 @@ if "%VERSION%"=="" (
 
 echo.
 echo Step 1: Updating package.json version to %VERSION%...
-powershell -NoProfile -Command "$content = Get-Content 'Packages\com.ajcampbell.holocade\package.json' -Raw; $content = $content -replace '(\"version\":\s*\")([^\"]+)(\")', '$1%VERSION%$3'; Set-Content 'Packages\com.ajcampbell.holocade\package.json' -Value $content -NoNewline"
+powershell -NoProfile -Command "$p = '%~dp0package.json'; $content = Get-Content -LiteralPath $p -Raw; $content = $content -replace '(\"version\":\s*\")([^\"]+)(\")', '$1%VERSION%$3'; Set-Content -LiteralPath $p -Value $content -NoNewline"
 if %ERRORLEVEL% NEQ 0 (
     echo Error: Failed to update package.json
     exit /b 1
@@ -26,7 +31,7 @@ echo   [OK] package.json updated
 
 echo.
 echo Step 2: Staging package.json...
-git add Packages/com.ajcampbell.holocade/package.json
+git -C "%REPO_ROOT%" add Packages/com.ajcampbell.holocade/package.json
 if %ERRORLEVEL% NEQ 0 (
     echo Warning: Git add failed (package.json may not have changed)
 )
@@ -34,7 +39,7 @@ if %ERRORLEVEL% NEQ 0 (
 echo.
 set /p COMMIT_CHANGES="Commit version change? (y/n): "
 if /i "%COMMIT_CHANGES%"=="y" (
-    git commit -m "Bump version to %VERSION%"
+    git -C "%REPO_ROOT%" commit -m "Bump version to %VERSION%"
     if %ERRORLEVEL% NEQ 0 (
         echo Warning: Commit failed (may be no changes to commit)
     ) else (
@@ -48,7 +53,7 @@ if /i "%CREATE_TAG%"=="y" (
     set /p TAG_MESSAGE="Tag message (or press Enter for default): "
     if "!TAG_MESSAGE!"=="" set TAG_MESSAGE=Release version %VERSION%
     
-    git tag -a v%VERSION% -m "!TAG_MESSAGE!"
+    git -C "%REPO_ROOT%" tag -a v%VERSION% -m "!TAG_MESSAGE!"
     if %ERRORLEVEL% NEQ 0 (
         echo Error: Failed to create tag (tag may already exist)
         exit /b 1

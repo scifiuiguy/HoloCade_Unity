@@ -41,9 +41,10 @@ echo "Port: $PORT"
 echo "Max Players: $MAX_PLAYERS"
 echo ""
 
-# Build path to server executable
+# Build path to server executable (Builds/ is at Unity project root, two levels up from this script)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVER_PATH="$SCRIPT_DIR/Builds/Server/HoloCade_UnityServer.x86_64"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SERVER_PATH="$PROJECT_ROOT/Builds/Server/HoloCade_UnityServer.x86_64"
 
 # Check if server executable exists
 if [ ! -f "$SERVER_PATH" ]; then

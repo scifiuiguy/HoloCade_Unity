@@ -30,13 +30,14 @@ if exist "C:\Program Files\Unity\Hub\Editor\6000.0.60f1\Editor\Unity.exe" (
     exit /b 1
 )
 
-echo Unity Path: %UNITY_PATH%
-echo Project Path: %~dp0
-echo.
+REM Script lives in Packages/com.ajcampbell.holocade/ — Unity project root is two levels up
+pushd "%~dp0..\.."
+set PROJECT_PATH=%CD%
+popd
 
-REM Get project path (remove trailing backslash)
-set PROJECT_PATH=%~dp0
-set PROJECT_PATH=%PROJECT_PATH:~0,-1%
+echo Unity Path: %UNITY_PATH%
+echo Project Path: %PROJECT_PATH%
+echo.
 
 REM Run Unity in batch mode to compile
 echo Starting Unity compilation (this may take 1-2 minutes)...

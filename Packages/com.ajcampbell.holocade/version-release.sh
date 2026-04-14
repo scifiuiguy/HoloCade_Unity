@@ -4,6 +4,11 @@
 
 set -e
 
+# Script lives in Packages/com.ajcampbell.holocade/ — repo root is two levels up
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PACKAGE_JSON="$SCRIPT_DIR/package.json"
+
 echo "========================================"
 echo "HoloCade Version Release Helper"
 echo "========================================"
@@ -19,23 +24,23 @@ echo
 echo "Step 1: Updating package.json version to $VERSION..."
 if command -v jq &> /dev/null; then
     # Use jq if available (more reliable)
-    jq ".version = \"$VERSION\"" Packages/com.ajcampbell.holocade/package.json > Packages/com.ajcampbell.holocade/package.json.tmp
-    mv Packages/com.ajcampbell.holocade/package.json.tmp Packages/com.ajcampbell.holocade/package.json
+    jq ".version = \"$VERSION\"" "$PACKAGE_JSON" > "$PACKAGE_JSON.tmp"
+    mv "$PACKAGE_JSON.tmp" "$PACKAGE_JSON"
 else
     # Fallback to sed
-    sed -i.bak "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" Packages/com.ajcampbell.holocade/package.json
-    rm Packages/com.ajcampbell.holocade/package.json.bak 2>/dev/null || true
+    sed -i.bak "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" "$PACKAGE_JSON"
+    rm "${PACKAGE_JSON}.bak" 2>/dev/null || true
 fi
 echo "  [OK] package.json updated"
 
 echo
 echo "Step 2: Staging package.json..."
-git add Packages/com.ajcampbell.holocade/package.json
+git -C "$REPO_ROOT" add Packages/com.ajcampbell.holocade/package.json
 
 echo
 read -p "Commit version change? (y/n): " COMMIT_CHANGES
 if [ "$COMMIT_CHANGES" = "y" ] || [ "$COMMIT_CHANGES" = "Y" ]; then
-    git commit -m "Bump version to $VERSION"
+    git -C "$REPO_ROOT" commit -m "Bump version to $VERSION"
     echo "  [OK] Version change committed"
 fi
 
@@ -47,7 +52,7 @@ if [ "$CREATE_TAG" = "y" ] || [ "$CREATE_TAG" = "Y" ]; then
         TAG_MESSAGE="Release version $VERSION"
     fi
     
-    git tag -a "v$VERSION" -m "$TAG_MESSAGE"
+    git -C "$REPO_ROOT" tag -a "v$VERSION" -m "$TAG_MESSAGE"
     echo "  [OK] Tag v$VERSION created"
 fi
 

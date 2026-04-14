@@ -14,9 +14,10 @@ if exist "C:\Program Files\Unity\Hub\Editor\6000.0.60f1\Editor\Unity.exe" (
     exit /b 1
 )
 
-REM Get project path
-set PROJECT_PATH=%~dp0
-set PROJECT_PATH=%PROJECT_PATH:~0,-1%
+REM Script lives in Packages/com.ajcampbell.holocade/ — Unity project root is two levels up
+pushd "%~dp0..\.."
+set PROJECT_PATH=%CD%
+popd
 
 REM Delete old report files to force fresh compilation check
 if exist "%PROJECT_PATH%\Temp\CompilationErrors.log" del "%PROJECT_PATH%\Temp\CompilationErrors.log"

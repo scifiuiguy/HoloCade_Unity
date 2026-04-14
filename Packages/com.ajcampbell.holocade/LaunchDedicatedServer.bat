@@ -45,8 +45,8 @@ echo Port: %PORT%
 echo Max Players: %MAX_PLAYERS%
 echo.
 
-REM Build path to server executable
-set SERVER_PATH="%~dp0Builds\Server\HoloCade_UnityServer.exe"
+REM Build path to server executable (Builds/ is at Unity project root, two levels up from this script)
+set SERVER_PATH="%~dp0..\..\Builds\Server\HoloCade_UnityServer.exe"
 
 REM Check if server executable exists
 if not exist %SERVER_PATH% (
