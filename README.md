@@ -3774,13 +3774,25 @@ HoloCade is open-source under the MIT License. Got ideas for how to make HoloCad
 
 ### Development Workflow
 
-1. Fork this repository and clone it (
-   `git clone https://github.com/your-username/holocade_unity.git`)
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Add your changes (`git add .`)
-4. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-5. Push to the branch (`git push origin feature/AmazingFeature`)
-6. Open a Pull Request
+This repository **is the HoloCade UPM package only** (see `package.json` at the root). It does **not** include a host Unity project—there is no `Assets/` or `ProjectSettings/` here to “open as a project.” To work on the SDK you use **an existing Unity project** (or a small throwaway test project) and load HoloCade into it.
+
+1. **Prepare a Unity project** — Unity 6 LTS (recommended) or 2022.3 LTS, with a profile that matches HoloCade’s needs (see [Prerequisites & Package Dependencies](#-prerequisites--package-dependencies)).
+
+2. **Add HoloCade into that project** using one of these patterns:
+   - **Git URL (Package Manager):** **Window → Package Manager → + → Add package from git URL** — e.g. `https://github.com/your-username/holocade_unity.git#main` (your fork) or the upstream URL from [Installation](#-installation).
+   - **Local package (best for fast iteration):** Fork and clone your fork somewhere on disk, then point your project’s `Packages/manifest.json` at the clone with a **local path**, for example:
+     ```json
+     "com.ajcampbell.holocade": "file:../../path/to/holocade_unity"
+     ```
+     (Adjust the relative path so it resolves to the repo root that contains `package.json`.) Unity will reimport when you change files in that folder.
+
+3. **Branch and implement** — In your clone, create a feature branch (`git checkout -b feature/AmazingFeature`), make edits, and verify in the Unity Editor (Console, play mode, your test scene) against the project from step 1.
+
+4. **Commit and push** — `git add`, `git commit`, `git push origin feature/AmazingFeature`.
+
+5. **Open a Pull Request** from your fork toward the upstream repository (`scifiuiguy/holocade_unity`).
+
+> **Tip:** Keep a dedicated test project for HoloCade work so you can regress multiplayer, XR, and build targets without mixing experiments into a production game repo.
 
 </blockquote>
 
