@@ -27,11 +27,23 @@ namespace HoloCade.Core.Networking
         [SerializeField] private int remotePort = 8888;
         [SerializeField] private string socketName = "HoloCade_UDP";
 
-        [Header("Events")]
-        public IntEvent onFloatReceived = new IntEvent();
-        public BoolEvent onBoolReceived = new BoolEvent();
-        public Int32Event onInt32Received = new Int32Event();
-        public BytesEvent onBytesReceived = new BytesEvent();
+        // Code-only: not serialized so inspector wiring cannot persist broken listener lists on prefabs.
+        private readonly IntEvent _onFloatReceived = new IntEvent();
+        private readonly BoolEvent _onBoolReceived = new BoolEvent();
+        private readonly Int32Event _onInt32Received = new Int32Event();
+        private readonly BytesEvent _onBytesReceived = new BytesEvent();
+
+        /// <summary>Invoked when a float payload is received for a channel (subscribe in code).</summary>
+        public IntEvent onFloatReceived => _onFloatReceived;
+
+        /// <summary>Invoked when a bool payload is received for a channel (subscribe in code).</summary>
+        public BoolEvent onBoolReceived => _onBoolReceived;
+
+        /// <summary>Invoked when an int32 payload is received for a channel (subscribe in code).</summary>
+        public Int32Event onInt32Received => _onInt32Received;
+
+        /// <summary>Invoked when a bytes payload is received for a channel (subscribe in code).</summary>
+        public BytesEvent onBytesReceived => _onBytesReceived;
 
         // Base UDP transport (handles raw socket management)
         private UDPTransportBase udpTransport;
@@ -286,7 +298,7 @@ namespace HoloCade.Core.Networking
                     {
                         bool boolValue = payloadData[0] != 0;
                         receivedBoolCache[channel] = boolValue;
-                        onBoolReceived?.Invoke(channel, boolValue);
+                        _onBoolReceived.Invoke(channel, boolValue);
                     }
                     break;
 
@@ -297,7 +309,7 @@ namespace HoloCade.Core.Networking
                             Array.Reverse(payloadData, 0, 4);
                         int intValue = BitConverter.ToInt32(payloadData, 0);
                         receivedInt32Cache[channel] = intValue;
-                        onInt32Received?.Invoke(channel, intValue);
+                        _onInt32Received.Invoke(channel, intValue);
                     }
                     break;
 
@@ -308,7 +320,7 @@ namespace HoloCade.Core.Networking
                             Array.Reverse(payloadData, 0, 4);
                         float floatValue = BitConverter.ToSingle(payloadData, 0);
                         receivedFloatCache[channel] = floatValue;
-                        onFloatReceived?.Invoke(channel, floatValue);
+                        _onFloatReceived.Invoke(channel, floatValue);
                     }
                     break;
 
@@ -321,7 +333,7 @@ namespace HoloCade.Core.Networking
                             byte[] bytes = new byte[byteLength];
                             Array.Copy(payloadData, 1, bytes, 0, byteLength);
                             receivedBytesCache[channel] = bytes;
-                            onBytesReceived?.Invoke(channel, bytes);
+                            _onBytesReceived.Invoke(channel, bytes);
                         }
                     }
                     break;
