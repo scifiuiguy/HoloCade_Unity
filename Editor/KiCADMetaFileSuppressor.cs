@@ -6,9 +6,8 @@ using System.IO;
 namespace HoloCade.Editor
 {
     /// <summary>
-    /// Prevents Unity from generating .meta files for KiCAD project files.
-    /// This keeps the PCBs directory visible in Unity's Project view while
-    /// preventing unnecessary metadata generation for non-Unity assets.
+    /// Deletes generated .meta files for KiCAD/non-Unity file types if they appear under the project,
+    /// so KiCAD assets do not accumulate redundant metadata when present (e.g. in FirmwareExamples).
     /// </summary>
     public class KiCADMetaFileSuppressor : AssetPostprocessor
 {

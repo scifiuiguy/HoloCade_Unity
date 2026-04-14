@@ -79,6 +79,7 @@ FirmwareExamples/
 - **[EscapeRoom/README.md](EscapeRoom/README.md)** - Escape room examples guide
 - **[GunshipExperience/README.md](GunshipExperience/README.md)** - Gunship experience examples guide
 - **[GunshipExperience/Gunship_Hardware_Specs.md](GunshipExperience/Gunship_Hardware_Specs.md)** - Complete hardware specifications for gun solenoid kickers
+- **[HoloCade_PCBs (KiCAD designs)](https://github.com/scifiuiguy/HoloCade_PCBs)** - Universal Shield, Child Shield, and Driver Shield PCBs (schematics, layouts, BOM, research). **Not** shipped inside this package; clone or browse that repository for board files.
 
 ---
 
