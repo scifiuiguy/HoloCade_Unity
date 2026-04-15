@@ -97,6 +97,7 @@ Use this tree for context: Root → Runtime Modules → Templates/Hardware. Prio
 * Always use LINQ for filtering sizable data sets unless I specify otherwise.
 * Ask my permission before using reflection for anything.
 * If/else formatting: inline each branch if its condition+statement < 100 chars, but put else on its own line; never place both branches on the same line; one semicolon per line.
+* In class names (and similar type names), treat well-known acronyms as exceptions to camel case: keep them all caps (e.g., `ECULocalizationIngress`, `UDPTransport`, `VOIPChannel`), not `EcuLocalizationIngress` or `UdpTransport`.
 
 ### Interface Naming Conventions
 
