@@ -138,7 +138,7 @@ namespace HoloCade.Editor
                     DrawCameraCenterHandle(sideCamera.transform, sideColor, side);
 
                 if (rig.DrawCameraFrustumsInScene)
-                    DrawCameraFrustum(sideCamera, sideColor, rig.DebugFrustumDepth);
+                    DrawCameraFrustum(sideCamera, sideColor);
             }
         }
 
@@ -229,10 +229,10 @@ namespace HoloCade.Editor
             Handles.color = oldColor;
         }
 
-        static void DrawCameraFrustum(Camera camera, Color color, float drawDepth)
+        static void DrawCameraFrustum(Camera camera, Color color)
         {
             var nearDistance = Mathf.Max(0.01f, camera.nearClipPlane);
-            var farDistance = Mathf.Max(nearDistance + 0.01f, Mathf.Min(camera.farClipPlane, drawDepth));
+            var farDistance = Mathf.Max(nearDistance + 0.01f, camera.farClipPlane);
 
             var nearCorners = new Vector3[4];
             var farCorners = new Vector3[4];

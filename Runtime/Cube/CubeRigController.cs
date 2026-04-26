@@ -32,7 +32,7 @@ namespace HoloCade.Cube
         [SerializeField] bool drawPortalFramesInScene = true;
         [SerializeField] bool drawCameraCentersInScene = true;
         [SerializeField] bool drawCameraFrustumsInScene = true;
-        [SerializeField, Min(0.05f)] float debugFrustumDepth = 1.25f;
+        [SerializeField, Min(0f)] float debugFrustumDepth = 0f;
 
         readonly Dictionary<CubeSide, Renderer> _portalRendererBySide = new Dictionary<CubeSide, Renderer>();
         readonly Dictionary<CubeSide, CubeSideCameraController> _cameraControllerBySide = new Dictionary<CubeSide, CubeSideCameraController>();
@@ -74,7 +74,7 @@ namespace HoloCade.Cube
         public bool DrawPortalFramesInScene => drawPortalFramesInScene;
         public bool DrawCameraCentersInScene => drawCameraCentersInScene;
         public bool DrawCameraFrustumsInScene => drawCameraFrustumsInScene;
-        public float DebugFrustumDepth => Mathf.Max(0.05f, debugFrustumDepth);
+        public float DebugFrustumDepth => Mathf.Max(0f, debugFrustumDepth);
 
         public void RebuildRig()
         {
@@ -131,7 +131,7 @@ namespace HoloCade.Cube
         void OnValidate()
         {
             selectedMonitorIndex = Mathf.Max(0, selectedMonitorIndex);
-            debugFrustumDepth = Mathf.Max(0.05f, debugFrustumDepth);
+            debugFrustumDepth = Mathf.Max(0f, debugFrustumDepth);
 
             if (!Application.isPlaying && liveUpdateInEditMode && isActiveAndEnabled)
                 QueueEditorSafeRebuild();
