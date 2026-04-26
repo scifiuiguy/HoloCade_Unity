@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: acf4dcfdca426ab4485a0dd3af29723d, type: 3}
+  m_Name: CubeMonitorCatalog
+  m_EditorClassIdentifier: 
+  monitors:
+  - {fileID: 11400000, guid: 355221a3b0596c542a563e989d0ec3be, type: 2}
+  - {fileID: 11400000, guid: d3e93493c81095844b3dfb58faa07bcd, type: 2}

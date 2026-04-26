@@ -1,0 +1,93 @@
+// Copyright (c) 2025 AJ Campbell. Licensed under the MIT License.
+
+#pragma kernel ClearTarget
+#pragma kernel ReprojectSource
+
+RWTexture2D<float4> _OutputColor;
+RWTexture2D<int> _OutputDepth;
+
+Texture2D<float4> _SourceColor;
+Texture2D<float4> _SourceDepth;
+Texture2D<float4> _SourceConfidence;
+
+int _OutputWidth;
+int _OutputHeight;
+int _SourceWidth;
+int _SourceHeight;
+int _UseConfidence;
+float _ConfidenceThreshold;
+
+float4 _SourceIntrinsics; // fx, fy, cx, cy
+float4x4 _SourceCameraToWorld;
+float4x4 _TargetWorldToCamera;
+float4x4 _TargetProjection;
+
+static const int kDepthInitMax = 2147483647;
+
+[numthreads(8, 8, 1)]
+void ClearTarget(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)_OutputWidth || id.y >= (uint)_OutputHeight)
+        return;
+
+    _OutputColor[int2(id.xy)] = float4(0, 0, 0, 1);
+    _OutputDepth[int2(id.xy)] = kDepthInitMax;
+}
+
+[numthreads(8, 8, 1)]
+void ReprojectSource(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)_SourceWidth || id.y >= (uint)_SourceHeight)
+        return;
+
+    int2 srcCoord = int2(id.xy);
+    float depthMeters = _SourceDepth[srcCoord].r;
+    if (depthMeters <= 0.001)
+        return;
+
+    float confidence = 1.0;
+    if (_UseConfidence != 0)
+    {
+        confidence = _SourceConfidence[srcCoord].r;
+        if (confidence < _ConfidenceThreshold)
+            return;
+    }
+
+    float fx = _SourceIntrinsics.x;
+    float fy = _SourceIntrinsics.y;
+    float cx = _SourceIntrinsics.z;
+    float cy = _SourceIntrinsics.w;
+
+    float x = ((float)srcCoord.x - cx) * depthMeters / max(0.0001, fx);
+    float y = ((float)srcCoord.y - cy) * depthMeters / max(0.0001, fy);
+    float z = depthMeters;
+    float4 sourceCamPoint = float4(x, y, z, 1.0);
+
+    float4 worldPoint = mul(_SourceCameraToWorld, sourceCamPoint);
+    float4 targetCamPoint = mul(_TargetWorldToCamera, worldPoint);
+    if (targetCamPoint.z <= 0.001)
+        return;
+
+    float4 clip = mul(_TargetProjection, targetCamPoint);
+    if (abs(clip.w) <= 0.0001)
+        return;
+
+    float3 ndc = clip.xyz / clip.w;
+    if (ndc.x < -1.0 || ndc.x > 1.0 || ndc.y < -1.0 || ndc.y > 1.0 || ndc.z < -1.0 || ndc.z > 1.0)
+        return;
+
+    int tx = clamp((int)round((ndc.x * 0.5 + 0.5) * (_OutputWidth - 1)), 0, _OutputWidth - 1);
+    int ty = clamp((int)round((ndc.y * 0.5 + 0.5) * (_OutputHeight - 1)), 0, _OutputHeight - 1);
+    int2 dstCoord = int2(tx, ty);
+
+    int depthBits = asint(asuint(targetCamPoint.z));
+    int previousDepthBits;
+    InterlockedMin(_OutputDepth[dstCoord], depthBits, previousDepthBits);
+    if (depthBits > previousDepthBits)
+        return;
+
+    float4 color = _SourceColor[srcCoord];
+    color.rgb *= confidence;
+    color.a = 1.0;
+    _OutputColor[dstCoord] = color;
+}

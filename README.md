@@ -188,6 +188,8 @@ platform.SendPlatformTilt(0.5f, -0.3f, 0f, 1.5f);  // TiltX, TiltY, Vertical, Du
 - [Input README](https://github.com/scifiuiguy/holocade_unity/blob/main/Runtime/Core/Input/README.md) - `Runtime/Core/Input/README.md`
 - [VOIP README](https://github.com/scifiuiguy/holocade_unity/blob/main/Runtime/VOIP/README.md) - `Runtime/VOIP/README.md`
 - [EmbeddedSystems README](https://github.com/scifiuiguy/holocade_unity/blob/main/Runtime/EmbeddedSystems/README.md) - `Runtime/EmbeddedSystems/README.md`
+- [Cube Module README](https://github.com/scifiuiguy/holocade_unity/blob/main/Runtime/Cube/CUBE_MODULE_README.md) - `Runtime/Cube/CUBE_MODULE_README.md`
+- [Cabinet NEXT_STEPS](https://github.com/scifiuiguy/holocade_unity/blob/main/Runtime/Cabinet/NEXT_STEPS.md) - `Runtime/Cabinet/NEXT_STEPS.md`
 
 **Firmware Examples:**
 - [FirmwareExamples README](https://github.com/scifiuiguy/holocade_unity/blob/main/FirmwareExamples/README.md) - `FirmwareExamples/README.md`
@@ -1933,6 +1935,86 @@ faceController.InitializeAIFace(config);
 ```
 
 **Note:** This component is part of the `AIFacemask` module, which is used by `AIFacemaskExperience`. The `HoloCadeAI` API provides the underlying AI services (LLM, ASR, TTS) that generate the content for facial animation.
+
+</blockquote>
+
+</details>
+
+<details>
+<summary><strong>🕹️ Cabinet Module (`HoloCade.Cabinet`)</strong></summary>
+
+<blockquote>
+
+### Cabinet Module (`HoloCade.Cabinet`)
+
+Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
+
+**Primary Runtime Types:**
+- `ArcadeCabinetBridge` - packet parser/event façade for start, joystick, button, coin, card, and catch-all "other" inputs
+- `ArcadeCabinetIOConfig` - ScriptableObject defining cabinet topology, packet channels, shared/per-player credit mode, and slot bindings
+- `PlayerSlotIoBindings` - per-player station capability profile (start button, joystick count, button count, LED mapping)
+- `CabinetConfigPresets` - convenience runtime templates for known cabinet patterns
+- `CabinetDiagnosticsHost` / `CabinetDiagnosticsRegistry` / `ICabinetDiagnosticPage` - diagnostics extension points for QC and service tooling
+
+**Packet Model (ECU -> Game):**
+- Message envelope: `[messageType][playerSlotIndex][payload...]`
+- Shared credit mode uses `playerSlotIndex = -1` for coin/card packets
+- Per-player mode emits coin/card pulses on each station slot
+
+**Inbound Events (Bridge):**
+- `OnStartPressed(slot)`
+- `OnJoystick(slot, joystickIndex, Vector2)`
+- `OnButtonState(slot, buttonIndex, pressed)`
+- `OnSharedCoinPulse()` / `OnSharedCardPulse()`
+- `OnPlayerCoinPulse(slot)` / `OnPlayerCardPulse(slot)`
+- `OnOtherInput(slot, bytes)`
+
+**Outbound Controls (Game -> ECU):**
+- `SetButtonLedOutput(slot, buttonIndex, normalizedLevel)`
+- `SendCabinetCommandPacket(payload)`
+
+**Use in Titles:**
+- Keep title logic thin: consume bridge events and map to game-level input providers
+- Keep shared packet transport and cabinet topology configuration in HoloCade SDK
+- Implement title-specific control semantics (e.g. Up/Down meaning, game state transitions) in title code
+
+</blockquote>
+
+</details>
+
+<details>
+<summary><strong>🧊 Cube Module (`HoloCade.Cube`)</strong></summary>
+
+<blockquote>
+
+### Cube Module (`HoloCade.Cube`)
+
+Rendering/runtime system for 4-side (or optional 2-side) inward-facing cube displays with tracked parallax and virtual passthrough.
+
+**Primary Runtime Types:**
+- `CubeRigController` - procedural N/S/E/W side rig builder (cameras, portals, floor, frame)
+- `CubeSideCameraController` - per-side tracked camera controller with off-axis projection and mandatory oblique boundary clipping
+- `CubeRuntimeConfig` - ScriptableObject for cube dimensions, projection settings, tracking bounds, and visual materials
+- `CubeFaceTrackingProviderBase` - abstract provider contract for side-specific eye position input (MediaPipe integration target)
+- `CubePassthroughSources` - per-side feed texture assignments
+
+**Stereo Reprojection Pipeline (current scaffold):**
+- `CubeStereoFrameProviderBase` + `CubeStereoFrame` - input contract for left/right color/depth/confidence + intrinsics/extrinsics
+- `CubeStereoCpuReprojectionPass` - CPU reference implementation (correctness/debug baseline)
+- `CubeStereoReprojection.compute` + `CubeStereoGpuReprojectionPass` - GPU reprojection and depth-arbitrated compositing path
+
+**Rendering Guarantees (target behavior):**
+- Side cameras are inward-facing and boundary-anchored
+- Off-axis frustum updates from tracked eye position
+- Oblique near-plane clipping keeps clipping fixed to boundary plane (portal semantics)
+- Passthrough portals show opposing sides while same-side portal naturally backface-culls
+
+**Mode Support:**
+- 4-player mode: North/South/East/West active
+- 2-player mode: North/South active only; East/West displays/cameras/interfaces can be omitted
+
+See detailed implementation notes and next steps in:
+- `Runtime/Cube/CUBE_MODULE_README.md`
 
 </blockquote>
 
