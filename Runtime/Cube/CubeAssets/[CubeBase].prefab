@@ -1587,7 +1587,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 87217006d7436ef43b66db1534152c5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  runtimeConfig: {fileID: 11400000, guid: 537c22c369b56aa49a7d3c1c4c501ffd, type: 2}
+  runtimeConfig: {fileID: 11400000, guid: 9b2bec1bea02fd04d9b840bf58311b10, type: 2}
   monitorCatalog: {fileID: 11400000, guid: 53d123db824118c4b8b070f03788353f, type: 2}
   selectedMonitorIndex: 0
   useSelectedMonitorDimensions: 1

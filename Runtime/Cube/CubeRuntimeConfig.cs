@@ -35,6 +35,14 @@ namespace HoloCade.Cube
         public Material passthroughMaterialTemplate;
         [Min(0.01f)] public float portalInset = 0f;
         public int passthroughPortalLayer = 0;
+        [Tooltip("When enabled, each side portal gets its own layer and side cameras cull orthogonal feeds (N/S cameras render N/S portals, E/W cameras render E/W portals).")]
+        public bool cullOrthogonalPortalFeeds = true;
+        [Range(0, 31)] public int northPortalLayer = 24;
+        [Range(0, 31)] public int southPortalLayer = 25;
+        [Range(0, 31)] public int eastPortalLayer = 26;
+        [Range(0, 31)] public int westPortalLayer = 27;
+        [Min(0.1f)] public float northSouthBackdropWidthMultiplier = 1.75f;
+        [Min(0.1f)] public float eastWestBackdropWidthMultiplier = 1.75f;
 
         [Header("Cabinet Visuals")]
         public Material floorMaterial;

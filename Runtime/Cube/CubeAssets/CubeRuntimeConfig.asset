@@ -17,7 +17,7 @@ MonoBehaviour:
   cubeHeight: 0.737
   cameraOffsetOutsideBoundary: 0.6096
   nominalNearClip: 0.01
-  farClip: 10
+  farClip: 30
   fovDegrees: 60
   sideCameraCullingMask:
     serializedVersion: 2

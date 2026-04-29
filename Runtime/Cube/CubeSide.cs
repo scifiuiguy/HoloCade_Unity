@@ -37,5 +37,22 @@ namespace HoloCade.Cube
                 default: return "Unknown";
             }
         }
+
+        public static bool IsNorthSouthPair(CubeSide side)
+        {
+            return side == CubeSide.North || side == CubeSide.South;
+        }
+
+        public static CubeSide Opposite(CubeSide side)
+        {
+            switch (side)
+            {
+                case CubeSide.North: return CubeSide.South;
+                case CubeSide.South: return CubeSide.North;
+                case CubeSide.East: return CubeSide.West;
+                case CubeSide.West: return CubeSide.East;
+                default: return CubeSide.North;
+            }
+        }
     }
 }

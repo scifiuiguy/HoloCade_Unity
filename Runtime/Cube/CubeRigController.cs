@@ -16,7 +16,7 @@ namespace HoloCade.Cube
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
-    public class CubeRigController : MonoBehaviour
+    public class CubeRigController : MonoBehaviour, ICubeDisplayAspect
     {
         [SerializeField] CubeRuntimeConfig runtimeConfig;
         [Header("Monitor Selection")]
@@ -64,6 +64,20 @@ namespace HoloCade.Cube
             if (monitorCatalog == null)
                 return false;
             return monitorCatalog.TryGetMonitor(selectedMonitorIndex, out monitor);
+        }
+
+        /// <inheritdoc cref="ICubeDisplayAspect.TryGetDisplayAspectInches"/>
+        public bool TryGetDisplayAspectInches(out float widthInches, out float heightInches)
+        {
+            widthInches = 0f;
+            heightInches = 0f;
+            if (!TryGetSelectedMonitor(out var spec) || spec == null)
+                return false;
+            if (spec.screenWidthInches <= 0.0001f || spec.screenHeightInches <= 0.0001f)
+                return false;
+            widthInches = spec.screenWidthInches;
+            heightInches = spec.screenHeightInches;
+            return true;
         }
 
         public void SetSelectedMonitorIndex(int index)
@@ -168,6 +182,7 @@ namespace HoloCade.Cube
                 cameraGo.transform.localPosition,
                 GetPortalWidthForSide(side, dimensions),
                 dimensions.y);
+            camera.cullingMask = BuildCameraCullingMask(side);
             _cameraControllerBySide[side] = controller;
 
             var portal = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -177,7 +192,7 @@ namespace HoloCade.Cube
             portal.transform.localPosition = faceCenter + (inward * runtimeConfig.portalInset);
             portal.transform.localRotation = Quaternion.LookRotation(outward, Vector3.up);
             portal.transform.localScale = new Vector3(GetPortalWidthForSide(side, dimensions), dimensions.y, 1f);
-            portal.layer = runtimeConfig.passthroughPortalLayer;
+            portal.layer = GetPortalLayerForSide(side);
             _generatedObjects.Add(portal);
 
             var renderer = portal.GetComponent<Renderer>();
@@ -256,9 +271,13 @@ namespace HoloCade.Cube
 
         float GetPortalWidthForSide(CubeSide side, Vector3 dimensions)
         {
-            return (side == CubeSide.North || side == CubeSide.South)
+            var baseWidth = (side == CubeSide.North || side == CubeSide.South)
                 ? dimensions.x
                 : dimensions.z;
+            var widthMultiplier = CubeSideUtility.IsNorthSouthPair(side)
+                ? runtimeConfig.northSouthBackdropWidthMultiplier
+                : runtimeConfig.eastWestBackdropWidthMultiplier;
+            return baseWidth * Mathf.Max(0.1f, widthMultiplier);
         }
 
         Vector3 GetHalfExtents(Vector3 dimensions)
@@ -309,6 +328,46 @@ namespace HoloCade.Cube
             var needsInitialBuild = _portalRendererBySide.Count == 0 || _cameraControllerBySide.Count == 0;
             if (dimensionsChanged || monitorChanged || needsInitialBuild)
                 RebuildRig();
+        }
+
+        int GetPortalLayerForSide(CubeSide side)
+        {
+            if (!runtimeConfig.cullOrthogonalPortalFeeds)
+                return runtimeConfig.passthroughPortalLayer;
+
+            switch (side)
+            {
+                case CubeSide.North: return runtimeConfig.northPortalLayer;
+                case CubeSide.South: return runtimeConfig.southPortalLayer;
+                case CubeSide.East: return runtimeConfig.eastPortalLayer;
+                case CubeSide.West: return runtimeConfig.westPortalLayer;
+                default: return runtimeConfig.passthroughPortalLayer;
+            }
+        }
+
+        int BuildCameraCullingMask(CubeSide side)
+        {
+            var mask = runtimeConfig.sideCameraCullingMask.value;
+            if (!runtimeConfig.cullOrthogonalPortalFeeds)
+                return mask;
+
+            mask &= ~(1 << runtimeConfig.northPortalLayer);
+            mask &= ~(1 << runtimeConfig.southPortalLayer);
+            mask &= ~(1 << runtimeConfig.eastPortalLayer);
+            mask &= ~(1 << runtimeConfig.westPortalLayer);
+
+            if (CubeSideUtility.IsNorthSouthPair(side))
+            {
+                mask |= 1 << runtimeConfig.northPortalLayer;
+                mask |= 1 << runtimeConfig.southPortalLayer;
+            }
+            else
+            {
+                mask |= 1 << runtimeConfig.eastPortalLayer;
+                mask |= 1 << runtimeConfig.westPortalLayer;
+            }
+
+            return mask;
         }
 
 #if UNITY_EDITOR
