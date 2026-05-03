@@ -21,6 +21,8 @@ namespace HoloCade.Cube
         public CubeSide Side { get; private set; }
         public Camera SideCamera => _sideCamera;
 
+        /// <param name="windowWidth">Physical inner opening width (m) on this face — off-axis frustum is fit to this, not the passthrough backdrop quad.</param>
+        /// <param name="windowHeight">Physical inner opening height (m).</param>
         public void Initialize(
             CubeSide side,
             CubeRuntimeConfig runtimeConfig,

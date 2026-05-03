@@ -111,6 +111,7 @@ The following runtime files currently exist under `Runtime/Cube/`:
     - frame edge primitives
   - Applies passthrough source textures to side portals.
   - Exposes side camera and portal renderer accessors for downstream reprojection systems.
+  - Side camera off-axis frustum uses the **physical inner opening** only (`GetPhysicalBoundaryWindowWidthForSide` × `dimensions.y`). Passthrough portal quads first apply backdrop width/height multipliers as **minimum** size, then expand to **`passthroughTextureAspectWidth` : `passthroughTextureAspectHeight`** (default **16:9**) so the mesh matches wide-angle comp render targets, not the monitor-driven face aspect.
 
 - `CubeStereoFrame.cs`
   - Stereo frame contracts for reprojection input:

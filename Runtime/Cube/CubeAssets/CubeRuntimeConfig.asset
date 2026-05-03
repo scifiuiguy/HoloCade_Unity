@@ -33,7 +33,19 @@ MonoBehaviour:
   passthroughMaterialTemplate: {fileID: 0}
   portalInset: 0
   passthroughPortalLayer: 0
+  cullOrthogonalPortalFeeds: 1
+  northPortalLayer: 24
+  southPortalLayer: 25
+  eastPortalLayer: 26
+  westPortalLayer: 27
+  northSouthBackdropWidthMultiplier: 6.125
+  eastWestBackdropWidthMultiplier: 6.125
+  passthroughBackdropHeightMultiplier: 6.125
+  passthroughTextureAspectWidth: 16
+  passthroughTextureAspectHeight: 9
   floorMaterial: {fileID: 0}
+  ceilingMaterial: {fileID: 0}
   frameMaterial: {fileID: 0}
   frameThickness: 0.03
   floorOffset: -0.001
+  ceilingOffset: 0.001

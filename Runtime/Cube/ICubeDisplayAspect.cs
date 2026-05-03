@@ -1,5 +1,7 @@
 // Copyright (c) 2025 AJ Campbell. Licensed under the MIT License.
 
+using UnityEngine;
+
 namespace HoloCade.Cube
 {
     /// <summary>
@@ -13,5 +15,11 @@ namespace HoloCade.Cube
         /// Inches for the active spec, e.g. 16:9 = width 16, height 9. False if the rig has no current monitor.
         /// </summary>
         bool TryGetDisplayAspectInches(out float widthInches, out float heightInches);
+
+        /// <summary>
+        /// Physical inner Cube size in meters: X and Z = horizontal (portrait stack), Y = vertical, matching
+        /// <see cref="CubeRigController"/>'s effective build dimensions. False if the rig is not configured.
+        /// </summary>
+        bool TryGetCubeDimensionsMeters(out Vector3 cubeDimensionsMeters);
     }
 }

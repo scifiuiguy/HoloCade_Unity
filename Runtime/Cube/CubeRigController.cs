@@ -12,7 +12,7 @@ namespace HoloCade.Cube
     /// Procedurally builds and maintains a 4-sided Cube rendering rig:
     /// - 4 inward-facing side cameras (N/S/E/W)
     /// - 4 boundary portals carrying passthrough textures
-    /// - virtual floor and frame primitives
+    /// - virtual floor, ceiling, and frame primitives
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -80,6 +80,16 @@ namespace HoloCade.Cube
             return true;
         }
 
+        /// <inheritdoc cref="ICubeDisplayAspect.TryGetCubeDimensionsMeters"/>
+        public bool TryGetCubeDimensionsMeters(out Vector3 cubeDimensionsMeters)
+        {
+            cubeDimensionsMeters = default;
+            if (runtimeConfig == null)
+                return false;
+            cubeDimensionsMeters = GetEffectiveCubeDimensions();
+            return cubeDimensionsMeters.x > 0.0001f && cubeDimensionsMeters.y > 0.0001f;
+        }
+
         public void SetSelectedMonitorIndex(int index)
         {
             selectedMonitorIndex = Mathf.Max(0, index);
@@ -107,6 +117,7 @@ namespace HoloCade.Cube
             BuildSide(CubeSide.East);
             BuildSide(CubeSide.West);
             BuildFloor();
+            BuildCeiling();
             BuildFrame();
             ApplyPassthroughTextures();
 
@@ -180,7 +191,7 @@ namespace HoloCade.Cube
                 faceTrackingProvider,
                 sideRoot.transform,
                 cameraGo.transform.localPosition,
-                GetPortalWidthForSide(side, dimensions),
+                GetPhysicalBoundaryWindowWidthForSide(side, dimensions),
                 dimensions.y);
             camera.cullingMask = BuildCameraCullingMask(side);
             _cameraControllerBySide[side] = controller;
@@ -191,7 +202,7 @@ namespace HoloCade.Cube
             portal.transform.SetParent(transform, false);
             portal.transform.localPosition = faceCenter + (inward * runtimeConfig.portalInset);
             portal.transform.localRotation = Quaternion.LookRotation(outward, Vector3.up);
-            portal.transform.localScale = new Vector3(GetPortalWidthForSide(side, dimensions), dimensions.y, 1f);
+            portal.transform.localScale = ComputePassthroughPortalLocalScale(side, dimensions);
             portal.layer = GetPortalLayerForSide(side);
             _generatedObjects.Add(portal);
 
@@ -219,6 +230,23 @@ namespace HoloCade.Cube
             var renderer = floor.GetComponent<Renderer>();
             if (renderer != null && runtimeConfig.floorMaterial != null)
                 renderer.sharedMaterial = runtimeConfig.floorMaterial;
+        }
+
+        void BuildCeiling()
+        {
+            var dimensions = GetEffectiveCubeDimensions();
+            var ceiling = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            ceiling.AddComponent<CubeGeneratedMarker>();
+            ceiling.name = "Cube_Ceiling";
+            ceiling.transform.SetParent(transform, false);
+            ceiling.transform.localPosition = new Vector3(0f, GetHalfExtents(dimensions).y - runtimeConfig.ceilingOffset, 0f);
+            ceiling.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+            ceiling.transform.localScale = new Vector3(dimensions.x, dimensions.z, 1f);
+            _generatedObjects.Add(ceiling);
+
+            var renderer = ceiling.GetComponent<Renderer>();
+            if (renderer != null && runtimeConfig.ceilingMaterial != null)
+                renderer.sharedMaterial = runtimeConfig.ceilingMaterial;
         }
 
         void BuildFrame()
@@ -269,15 +297,53 @@ namespace HoloCade.Cube
                 renderer.sharedMaterial = runtimeConfig.frameMaterial;
         }
 
-        float GetPortalWidthForSide(CubeSide side, Vector3 dimensions)
+        /// <summary>
+        /// Inner cube opening width (m) for this side — used for off-axis frustum so the player sees only the correct
+        /// portion of the passthrough backdrop for their head position.
+        /// </summary>
+        static float GetPhysicalBoundaryWindowWidthForSide(CubeSide side, Vector3 dimensions)
         {
-            var baseWidth = (side == CubeSide.North || side == CubeSide.South)
+            return (side == CubeSide.North || side == CubeSide.South)
                 ? dimensions.x
                 : dimensions.z;
+        }
+
+        /// <summary>
+        /// Minimum passthrough portal width (m) on this face before 16:9 (or configured) aspect expansion; independent of the camera frustum.
+        /// </summary>
+        float GetPassthroughBackdropWidthForSide(CubeSide side, Vector3 dimensions)
+        {
+            var baseWidth = GetPhysicalBoundaryWindowWidthForSide(side, dimensions);
             var widthMultiplier = CubeSideUtility.IsNorthSouthPair(side)
                 ? runtimeConfig.northSouthBackdropWidthMultiplier
                 : runtimeConfig.eastWestBackdropWidthMultiplier;
             return baseWidth * Mathf.Max(0.1f, widthMultiplier);
+        }
+
+        /// <summary>
+        /// Minimum passthrough portal height (m) along the face vertical before aspect lock. Frustum still uses physical <c>dimensions.y</c>.
+        /// </summary>
+        float GetPassthroughBackdropHeight(Vector3 dimensions)
+        {
+            return dimensions.y * Mathf.Max(0.1f, runtimeConfig.passthroughBackdropHeightMultiplier);
+        }
+
+        /// <summary>
+        /// Passthrough quad local scale: width/height ratio matches <see cref="CubeRuntimeConfig.passthroughTextureAspectWidth"/>
+        /// over <see cref="CubeRuntimeConfig.passthroughTextureAspectHeight"/> (default 16:9), while at least covering the
+        /// backdrop minimum width/height from multipliers (independent of monitor face aspect).
+        /// </summary>
+        Vector3 ComputePassthroughPortalLocalScale(CubeSide side, Vector3 dimensions)
+        {
+            var minW = GetPassthroughBackdropWidthForSide(side, dimensions);
+            var minH = GetPassthroughBackdropHeight(dimensions);
+            var aw = Mathf.Max(0.01f, runtimeConfig.passthroughTextureAspectWidth);
+            var ah = Mathf.Max(0.01f, runtimeConfig.passthroughTextureAspectHeight);
+            var aspect = aw / ah;
+
+            var portalH = Mathf.Max(minH, minW / aspect);
+            var portalW = aspect * portalH;
+            return new Vector3(portalW, portalH, 1f);
         }
 
         Vector3 GetHalfExtents(Vector3 dimensions)
