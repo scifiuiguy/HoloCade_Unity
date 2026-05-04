@@ -226,7 +226,7 @@ Current scaffold uses primitive geometry with material hooks from `CubeRuntimeCo
 
 ## MediaPipe and Split-PC Architecture
 
-**Production intent:** face landmark inference and heavy multi-camera compositing run on a **Linux Mini-ITX** (see **`HoloCade_HyperCube`** at repo root). **Windows Unity** ingests **network-delivered** head poses and **processed textures** (e.g. `RenderTexture`/`Texture` updates from decoded streams) and maps them into the Cube prefab. **Link assumptions** (dual **2.5GbE**, MACO-class, no default **10GbE**) live in **`CubeModule_README.md`** at the repo root.
+**Production intent:** face landmark inference and heavy multi-camera compositing run on a **Linux Mini-ITX** (see **`HoloCade_HyperCube`** at repo root). **Windows Unity** ingests **network-delivered** head poses and **processed textures** (e.g. `RenderTexture`/`Texture` updates from decoded streams) and maps them into the Cube prefab. **Link assumptions** (dual **2.5GbE**, MACO-class; optional **OCuLink + SFP28 ~$400** upgrade and BOM) live in **`CubeModule_README.md`** at the repo root.
 
 Unity-side responsibilities:
 
