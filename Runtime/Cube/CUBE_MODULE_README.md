@@ -224,16 +224,23 @@ Current scaffold uses primitive geometry with material hooks from `CubeRuntimeCo
 
 ---
 
-## MediaPipe Integration Requirements
+## MediaPipe and Split-PC Architecture
 
-MediaPipe integration should be implemented as a concrete provider derived from `CubeFaceTrackingProviderBase`.
+**Production intent:** face landmark inference and heavy multi-camera compositing run on a **Linux Mini-ITX** (see **`HoloCade_HyperCube`** at repo root). **Windows Unity** ingests **network-delivered** head poses and **processed textures** (e.g. `RenderTexture`/`Texture` updates from decoded streams) and maps them into the Cube prefab. **Link assumptions** (dual **2.5GbE**, MACO-class, no default **10GbE**) live in **`CubeModule_README.md`** at the repo root.
 
-Expected responsibilities:
+Unity-side responsibilities:
 
-- receive and preprocess face landmarks per side
-- estimate eye center world position per player side
-- expose stable side-mapped output via `TryGetEyeCenterWorldPosition(...)`
+- **`CubeFaceTrackingProviderBase`:** implement a thin provider that **replays networked pose samples** (with smoothing / bounds) into `TryGetEyeCenterWorldPosition(...)`, rather than running MediaPipe inside Unity when using the split stack.
+- **`CubePassthroughSources`:** assign textures fed from the Windows ingest layer (decoded GPU uploads, shared memory, or native plugin—transport TBD alongside HyperCube).
+
+For **editor-only / single-PC prototypes**, a local MediaPipe-derived provider remains possible, but it is not the documented production path.
+
+Expected behavior of the **Unity tracking shim** (networked mode):
+
+- receive preprocessed per-side pose (or landmarks) from the vision PC
+- estimate or forward eye center in world space per side
 - apply confidence filtering, temporal smoothing, and dropout handling
+- respect the tracking bounds contract above
 
 ---
 
@@ -248,7 +255,7 @@ Expected responsibilities:
    - off-axis + oblique production mode
 3. Add automated sanity checks for invalid geometry config (zero-size windows, inverted normals, bad clip distances).
 4. Add GPU post-process passes for hole filling, depth-edge cleanup, and temporal smoothing.
-5. Implement concrete MediaPipe side tracking provider derived from `CubeFaceTrackingProviderBase`.
+5. Implement **`CubeFaceTrackingProviderBase`** for **networked** Linux→Windows tracking (and optional local debug stub).
 6. Add calibration/verification tooling for stereo intrinsics/extrinsics and per-side feed alignment.
 
 ---
