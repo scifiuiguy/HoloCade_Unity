@@ -95,6 +95,19 @@ namespace HoloCade.Cube
             selectedMonitorIndex = Mathf.Max(0, index);
         }
 
+        /// <summary>
+        /// Swap passthrough texture source (e.g. HyperCube runtime <see cref="CubePassthroughSources"/>)
+        /// and refresh portal materials when the rig is already built.
+        /// </summary>
+        public void SetPassthroughSources(CubePassthroughSources sources)
+        {
+            passthroughSources = sources;
+            if (isActiveAndEnabled && _portalRendererBySide.Count > 0)
+                ApplyPassthroughTextures();
+        }
+
+        public CubePassthroughSources PassthroughSources => passthroughSources;
+
         public bool DrawPortalFramesInScene => drawPortalFramesInScene;
         public bool DrawCameraCentersInScene => drawCameraCentersInScene;
         public bool DrawCameraFrustumsInScene => drawCameraFrustumsInScene;
