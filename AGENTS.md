@@ -12,6 +12,10 @@
 
 Use this tree for context: Root → Runtime Modules → Templates/Hardware. Prioritize OpenXR for VR tasks; use NetCode for multiplayer sims. For cross-engine parity, reference sibling Unreal repo (github.com/scifiuiguy/HoloCade_Unreal) via shared API mappings in /src/common (if added).
 
+## Version control (agents)
+
+- **Do not commit or push without an explicit request** — Do not run `git commit`, `git push`, or other commands that create local commits or update remotes unless the user **explicitly** asks you to commit and/or push (wording like “commit this” / “push to origin”). Edits to the working tree are fine; leaving commits for the user is the default.
+
 ## Table of Contents
 
 ### The Main Project README
@@ -110,6 +114,13 @@ Use this tree for context: Root → Runtime Modules → Templates/Hardware. Prio
 * Unity expects exactly one `.meta` file per asset. When generating metas, only create them for files that lack one.
 * **Never** point meta-generation helpers at files that already end in `.meta`; doing so creates `.meta.meta` (and worse) duplicates that must be deleted.
 * If you need bulk metas, filter out existing `.meta` files first (e.g., `Get-ChildItem -Recurse -File | Where-Object { $_.Extension -ne '.meta' }`).
+
+### Unity prefabs, scenes, and serialized YAML
+
+* **Avoid hand-editing** `.prefab`, `.unity`, `.asset`, and other serialized YAML to add components, fix references, or reorder behaviour stacks **unless** you are following **real `fileID` / `guid` values** from **Unity-generated `.meta` files** that are already committed and stable. Guessed or copied GUIDs cause **Missing (Mono Script)**, silent wrong references, merge pain, and CI/editor churn.
+* **Default workflow:** change prefabs/scenes **in the Unity Editor** (or ship **Editor scripts** / **Presets** that use serialized APIs) so Unity writes consistent YAML. Give humans **Inspector checklists** in markdown when wiring is non-obvious rather than patching YAML blind.
+* **New scripts:** until Unity imports the repo and writes `.meta` files, **do not** inject new `MonoBehaviour` blocks into prefab YAML—the script GUID does not exist yet.
+* **When YAML edits are acceptable:** mechanical bulk renames with verified mapping, line-ending normalization only, or changes validated by opening the project in Unity immediately after. If in doubt, **do not meddle**—prefab disasters are common and expensive.
 
 ## Automated Compilation Workflow
 

@@ -30,7 +30,8 @@ namespace HoloCade.Core.Networking
     {
         protected UdpClient udpSocket;
         protected IPEndPoint remoteEndPoint;
-        protected bool isConnected = false;
+        protected bool isConnected;
+        protected bool listenerMode;
 
         public UDPTransportBase()
         {
@@ -51,24 +52,21 @@ namespace HoloCade.Core.Networking
         /// <returns>True if initialization successful</returns>
         public bool InitializeUDPConnection(string remoteIP, int remotePort, string socketName = "HoloCade_UDP", bool enableBroadcast = false)
         {
+            ShutdownUDPConnection();
             try
             {
-                // Parse IP address
-                IPAddress ipAddress;
-                if (!IPAddress.TryParse(remoteIP, out ipAddress))
+                listenerMode = false;
+                if (!IPAddress.TryParse(remoteIP, out var ipAddress))
                 {
                     Debug.LogError($"{socketName}: Invalid IP address: {remoteIP}");
                     return false;
                 }
 
                 remoteEndPoint = new IPEndPoint(ipAddress, remotePort);
-
-                // Create UDP client
                 udpSocket = new UdpClient();
-                udpSocket.Client.Blocking = false;  // Non-blocking
+                udpSocket.Client.Blocking = false;
                 udpSocket.Client.ReceiveBufferSize = 8192;
                 udpSocket.EnableBroadcast = enableBroadcast;
-
                 isConnected = true;
                 Debug.Log($"{socketName}: UDP connection initialized (target: {remoteIP}:{remotePort}, broadcast: {enableBroadcast})");
                 return true;
@@ -76,6 +74,34 @@ namespace HoloCade.Core.Networking
             catch (Exception ex)
             {
                 Debug.LogError($"{socketName}: Failed to initialize UDP connection - {ex.Message}");
+                ShutdownUDPConnection();
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Bind a UDP socket to a local port (inbound datagrams from any sender). Use for vision PC → game PC pose streams.
+        /// </summary>
+        public bool InitializeUDPListener(string bindAddress, int listenPort, string socketName = "HoloCade_UDP_Listen", int receiveBufferSize = 65536)
+        {
+            ShutdownUDPConnection();
+            try
+            {
+                listenerMode = true;
+                if (!IPAddress.TryParse(bindAddress, out var ipAddress))
+                    ipAddress = IPAddress.Any;
+                var localEp = new IPEndPoint(ipAddress, listenPort);
+                udpSocket = new UdpClient(localEp);
+                udpSocket.Client.Blocking = false;
+                udpSocket.Client.ReceiveBufferSize = receiveBufferSize;
+                remoteEndPoint = null;
+                isConnected = true;
+                Debug.Log($"{socketName}: UDP listener bound {localEp}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"{socketName}: Failed to bind UDP listener - {ex.Message}");
                 ShutdownUDPConnection();
                 return false;
             }
@@ -102,12 +128,13 @@ namespace HoloCade.Core.Networking
 
             remoteEndPoint = null;
             isConnected = false;
+            listenerMode = false;
         }
 
         /// <summary>
         /// Check if UDP connection is active
         /// </summary>
-        public bool IsUDPConnected() => isConnected && udpSocket != null && remoteEndPoint != null;
+        public bool IsUDPConnected() => isConnected && udpSocket != null && (listenerMode || remoteEndPoint != null);
 
         /// <summary>
         /// Send raw data via UDP
@@ -116,7 +143,9 @@ namespace HoloCade.Core.Networking
         /// <returns>True if send was successful</returns>
         public bool SendUDPData(byte[] data)
         {
-            if (!IsUDPConnected() || data == null || data.Length == 0)
+            if (udpSocket == null || !isConnected || data == null || data.Length == 0)
+                return false;
+            if (remoteEndPoint == null)
                 return false;
 
             try

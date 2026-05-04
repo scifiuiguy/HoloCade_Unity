@@ -228,7 +228,7 @@ Current scaffold uses primitive geometry with material hooks from `CubeRuntimeCo
 
 **Production intent:** face landmark inference and heavy multi-camera compositing run on a **Linux Mini-ITX** (see **`HoloCade_HyperCube`** at repo root). **Windows Unity** ingests **network-delivered** head poses and **processed textures** (e.g. `RenderTexture`/`Texture` updates from decoded streams) and maps them into the Cube prefab. **Link assumptions** (dual **2.5GbE**, MACO-class; optional **OCuLink + SFP28 ~$400** upgrade and BOM) live in **`CubeModule_README.md`** at the repo root.
 
-**HyperCube ↔ Unity bridge (SDK):** `HyperCubeQuadrantTcpHost` (four TCP JPEG listeners, parameterized ports), `HyperCubeUdpPoseReceiver` (UDP bind + HoloCade binary parse), `HyperCubePassthroughBinder` (runtime `CubePassthroughSources` + `CubeRigController.SetPassthroughSources`), `HyperCubePoseChannelIds`, `HyperCubePoseTrackingProvider` (stub `CubeFaceTrackingProviderBase`). See **`HoloCade_HyperCube/README.md`** — *Unity loopback (dev)*.
+**HyperCube ↔ Unity bridge (SDK):** `HyperCubeQuadrantTcpHost` (four TCP JPEG listeners, parameterized ports), **`HoloCadeUDPTransport`** in **Local listener** role (same HoloCade binary framing as haptics / cabinet UDP), `HyperCubePassthroughBinder` (runtime `CubePassthroughSources` + `CubeRigController.SetPassthroughSources`), `HyperCubePoseChannelIds`, `HyperCubePoseTrackingProvider` (stub `CubeFaceTrackingProviderBase`). See **`HoloCade_HyperCube/README.md`** — *Unity loopback (dev)*.
 
 Unity-side responsibilities:
 

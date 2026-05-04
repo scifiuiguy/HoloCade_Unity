@@ -13,7 +13,7 @@ namespace HoloCade.Core.Networking
     /// HoloCade UDP Transport Component
     /// 
     /// Provides channel-based UDP communication using the HoloCade binary protocol.
-    /// Used by HapticPlatformController and other systems that need simple UDP IO.
+    /// Used by HapticPlatformController, HyperCube pose ingest (listener role), and other UDP IO.
     /// 
     /// Protocol: [0xAA][Type][Channel][Payload...][CRC]
     /// - No encryption (for performance)
@@ -22,10 +22,22 @@ namespace HoloCade.Core.Networking
     /// </summary>
     public class HoloCadeUDPTransport : MonoBehaviour
     {
+        public enum UdpRole
+        {
+            OutboundClient = 0,
+            LocalListener = 1
+        }
+
         [Header("Configuration")]
+        [SerializeField] private UdpRole udpRole = UdpRole.OutboundClient;
         [SerializeField] private string remoteIP = "192.168.1.100";
         [SerializeField] private int remotePort = 8888;
         [SerializeField] private string socketName = "HoloCade_UDP";
+
+        [Header("Local listener (e.g. HyperCube pose from vision PC)")]
+        [SerializeField] private string listenerBindAddress = "0.0.0.0";
+        [SerializeField] private int listenerPort = 18100;
+        [SerializeField] private int listenerReceiveBufferSize = 65536;
 
         // Code-only: not serialized so inspector wiring cannot persist broken listener lists on prefabs.
         private readonly IntEvent _onFloatReceived = new IntEvent();
@@ -74,7 +86,16 @@ namespace HoloCade.Core.Networking
 
         void Start()
         {
-            InitializeUDPConnection(remoteIP, remotePort, socketName);
+            if (udpRole == UdpRole.LocalListener)
+            {
+                udpTransport = new UDPTransportBase();
+                if (!udpTransport.InitializeUDPListener(listenerBindAddress, listenerPort, socketName, listenerReceiveBufferSize))
+                    Debug.LogError($"HoloCadeUDPTransport: listener bind failed ({listenerBindAddress}:{listenerPort})");
+                else
+                    ClearReceiveCaches();
+            }
+            else
+                InitializeUDPConnection(remoteIP, remotePort, socketName);
         }
 
         void Update()
@@ -98,19 +119,36 @@ namespace HoloCade.Core.Networking
             remoteIP = ip;
             remotePort = port;
             socketName = name;
+            udpRole = UdpRole.OutboundClient;
 
             udpTransport = new UDPTransportBase();
             bool success = udpTransport.InitializeUDPConnection(ip, port, name, false);
-
             if (success)
-            {
-                receivedFloatCache.Clear();
-                receivedBoolCache.Clear();
-                receivedInt32Cache.Clear();
-                receivedBytesCache.Clear();
-            }
-
+                ClearReceiveCaches();
             return success;
+        }
+
+        /// <summary>Inbound HoloCade packets on a fixed local port (vision PC sends here).</summary>
+        public bool InitializeUDPListener(string bindAddress, int port, string name = "HoloCade_UDP")
+        {
+            listenerBindAddress = bindAddress;
+            listenerPort = port;
+            socketName = name;
+            udpRole = UdpRole.LocalListener;
+
+            udpTransport = new UDPTransportBase();
+            bool success = udpTransport.InitializeUDPListener(bindAddress, port, name, listenerReceiveBufferSize);
+            if (success)
+                ClearReceiveCaches();
+            return success;
+        }
+
+        void ClearReceiveCaches()
+        {
+            receivedFloatCache.Clear();
+            receivedBoolCache.Clear();
+            receivedInt32Cache.Clear();
+            receivedBytesCache.Clear();
         }
 
         /// <summary>
@@ -124,10 +162,7 @@ namespace HoloCade.Core.Networking
                 udpTransport = null;
             }
 
-            receivedFloatCache.Clear();
-            receivedBoolCache.Clear();
-            receivedInt32Cache.Clear();
-            receivedBytesCache.Clear();
+            ClearReceiveCaches();
         }
 
         /// <summary>
@@ -198,6 +233,8 @@ namespace HoloCade.Core.Networking
             return receivedFloatCache.TryGetValue(channel, out float value) ? value : 0f;
         }
 
+        public bool TryGetFloat(int channel, out float value) => receivedFloatCache.TryGetValue(channel, out value);
+
         public bool GetReceivedBool(int channel)
         {
             return receivedBoolCache.TryGetValue(channel, out bool value) ? value : false;
@@ -207,6 +244,8 @@ namespace HoloCade.Core.Networking
         {
             return receivedInt32Cache.TryGetValue(channel, out int value) ? value : 0;
         }
+
+        public bool TryGetInt32(int channel, out int value) => receivedInt32Cache.TryGetValue(channel, out value);
 
         public byte[] GetReceivedBytes(int channel)
         {
