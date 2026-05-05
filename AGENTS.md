@@ -16,6 +16,12 @@ Use this tree for context: Root → Runtime Modules → Templates/Hardware. Prio
 
 - **Do not commit or push without an explicit request** — Do not run `git commit`, `git push`, or other commands that create local commits or update remotes unless the user **explicitly** asks you to commit and/or push (wording like “commit this” / “push to origin”). Edits to the working tree are fine; leaving commits for the user is the default.
 
+### Commit messages and agent attribution (default: off)
+
+- **Unless the user explicitly asks** to include tool attribution, **do not** add `Co-authored-by:`, “Made with Cursor,” or similar trailers to commit messages or PR bodies. Commits in this repo should read as **the user’s authorship** for clarity of ownership and public history.
+- **Cursor** may append `Co-authored-by: Cursor <cursoragent@cursor.com>` via a Git **`prepare-commit-msg`** hook when **Agent attribution** is enabled. The user should turn that off in **Cursor Settings** (**Ctrl+Shift+J** on Windows, or Command Palette → “Cursor Settings”) under **Agent / attribution** (exact labels vary by version); **restart Cursor** after toggling.
+- **`git commit --no-verify` does not skip `prepare-commit-msg`.** To amend a message **without** hooks re-injecting trailers (e.g. cleaning history), use an **empty hooks path** for that invocation only, e.g. `git -c core.hooksPath=/path/to/empty_dir commit --amend -m "…"` (create a directory with **no** hook scripts). Do not permanently disable the project’s `.git/hooks` unless the user asks.
+
 ## Table of Contents
 
 ### The Main Project README
