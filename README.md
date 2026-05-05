@@ -2856,6 +2856,26 @@ public class GunshipGameController : MonoBehaviour
 
 </details>
 
+<details>
+<summary><strong>Example 4: Omnidirectional Holographic Arcade</strong></summary>
+
+<blockquote>
+
+### Example 4: Omnidirectional Holographic Arcade
+
+1. Add the `CubeBase` prefab to your Unity scene, position it in the target play area, and keep it at true 1:1 real-world scale.
+2. Place your game content inside the Cube volume so gameplay is framed for inward-looking observation from all four sides.
+3. Download and run the HyperCube codebase. The HyperCube is an open-source Python service layer designed to support holographic rendering from a separate Linux device, but it can be run from the same Windows PC as the Unity build for testing purposes. Obtain it from [`scifiuiguy/HoloCade_HyperCube`](https://github.com/scifiuiguy/HoloCade_HyperCube)
+4. Hook up eight cameras plus four outward-facing monitors in `N/S/E/W` configuration (cube formation) where each monitor is flanked by a pair of cameras on its left and right. Ideally, you need cameras with global shutter, 60FPS or more, and 120FOV or more.
+5. Press Play in Unity, and then issue this run command for HyperCube:
+
+   `uv run hypercube-serve serve -c config.yaml`
+6. Observe your holographic content inside the cube powered by omni-parallax plus omni-passthrough.
+
+</blockquote>
+
+</details>
+
 ---
 
 ## 🏛️ Architecture
@@ -3701,14 +3721,41 @@ For any experience running one year or longer, HoloCade's author recommends cons
 
 </details>
 
-### ✅ Current (v0.1.3) Pre-Alpha
-
 <details>
-<summary><strong>v0.1.3 (In-Progress)</strong></summary>
+<summary><strong>v0.1.3 (Complete) — Cube Module Baseline</strong></summary>
 
 <blockquote>
 
-### 🎯 Planned (v0.1.3 - In-Progress)
+### ✅ Completed (v0.1.3)
+
+#### Cube Module — Core Runtime Functionality
+
+- [x] **Drop-in Cube base workflow** - `CubeBase` prefab, `CubeRuntimeConfig`, and monitor catalog/spec assets documented and usable for rapid scene setup.
+- [x] **Procedural rig generation** - `CubeRigController` builds side roots/cameras, boundary portal quads, floor geometry, and frame primitives.
+- [x] **Per-side camera stack** - North/South/East/West side cameras generated and managed with side identity helpers (`CubeSide`).
+- [x] **Face tracking provider contract** - `CubeFaceTrackingProviderBase` and side-based eye-center input contract established for runtime integrations.
+- [x] **Tracking bounds and smoothing behavior** - `CubeSideCameraController` applies smoothing and out-of-bounds rejection to preserve stable side camera motion.
+- [x] **Off-axis frustum projection** - Asymmetric projection applied per frame for side-correct perspective updates from tracked eye positions.
+- [x] **Oblique near-plane clipping** - Side boundary-aligned clipping integrated as mandatory behavior for correct window semantics.
+- [x] **Virtual passthrough source plumbing** - `CubePassthroughSources` and rig-side portal texture application wired for per-side physical camera feeds.
+- [x] **Stereo frame contracts** - `CubeStereoFrame` + `CubeStereoFrameProviderBase` define left/right color/depth/confidence inputs with calibration transforms.
+- [x] **CPU reprojection baseline** - `CubeStereoCpuReprojectionPass` shipped as correctness reference and debugging fallback.
+- [x] **GPU reprojection path** - `CubeStereoReprojection.compute` + `CubeStereoGpuReprojectionPass` provide compute-based reprojection/compositing.
+- [x] **Portal debug visualization hooks** - scene debug options and frustum/frame visualization available for alignment and setup diagnostics.
+- [x] **2-player/4-player deployment contract** - Cube architecture documented to support full 4-side operation and reduced North/South-only deployment.
+
+</blockquote>
+
+</details>
+
+### ✅ Current (v0.1.4) Pre-Alpha
+
+<details>
+<summary><strong>v0.1.4 (In-Progress)</strong></summary>
+
+<blockquote>
+
+### 🎯 Planned (v0.1.4 - In-Progress)
 
 #### Gunship Experience — Alpha Readiness
 
