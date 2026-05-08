@@ -23,6 +23,7 @@ namespace HoloCade.Editor
         SerializedProperty _drawCameraCentersInSceneProp;
         SerializedProperty _drawCameraFrustumsInSceneProp;
         SerializedProperty _debugFrustumDepthProp;
+        SerializedProperty _disableVSyncInPlayModeProp;
         static readonly CubeSide[] Sides = { CubeSide.North, CubeSide.South, CubeSide.East, CubeSide.West };
 
         void OnEnable()
@@ -40,6 +41,7 @@ namespace HoloCade.Editor
             _drawCameraCentersInSceneProp = serializedObject.FindProperty("drawCameraCentersInScene");
             _drawCameraFrustumsInSceneProp = serializedObject.FindProperty("drawCameraFrustumsInScene");
             _debugFrustumDepthProp = serializedObject.FindProperty("debugFrustumDepth");
+            _disableVSyncInPlayModeProp = serializedObject.FindProperty("disableVSyncInPlayMode");
         }
 
         public override void OnInspectorGUI()
@@ -66,6 +68,7 @@ namespace HoloCade.Editor
             EditorGUILayout.PropertyField(_drawCameraCentersInSceneProp);
             EditorGUILayout.PropertyField(_drawCameraFrustumsInSceneProp);
             EditorGUILayout.PropertyField(_debugFrustumDepthProp);
+            EditorGUILayout.PropertyField(_disableVSyncInPlayModeProp);
 
             EditorGUILayout.Space();
             if (GUILayout.Button("Rebuild Rig Now"))

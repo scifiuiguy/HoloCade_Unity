@@ -1989,7 +1989,7 @@ Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
 
 ### Cube Module (`HoloCade.Cube`)
 
-Rendering/runtime system for 4-side (or optional 2-side) inward-facing cube displays with tracked parallax and virtual passthrough.
+Rendering/runtime system for 4-side (or optional 2-side) inward-facing cube displays with omni-parallax and omni-passthrough.
 
 **Primary Runtime Types:**
 - `CubeRigController` - procedural N/S/E/W side rig builder (cameras, portals, floor, frame)
@@ -2015,6 +2015,62 @@ Rendering/runtime system for 4-side (or optional 2-side) inward-facing cube disp
 
 See detailed implementation notes and next steps in:
 - `Runtime/Cube/CUBE_MODULE_README.md`
+
+#### Display Output: Single-Display vs Multi-Display Cabinet
+
+The Cube ships in two physical configurations and the SDK has to support both from the same project, since developers iterate on a single laptop/desktop and ship to a 4-screen cabinet:
+
+| Mode | Where it runs | Camera → Display mapping | `Camera.enabled` policy |
+|---|---|---|---|
+| `SingleDisplay` (default) | Editor play mode, PC test builds | All 4 side cameras → `Display 1` | Consumer code (e.g. a viewport router) keeps **exactly one** side camera enabled at a time so a developer can preview a single station view without compositing collisions. |
+| `MultiDisplayCabinet` | Production cabinet builds (Windows / Linux desktop, 4 monitors) | Each side camera → its own physical `UnityEngine.Display` per `CubeRuntimeConfig` mapping (default N=0, S=1, E=2, W=3) | All 4 cameras stay **enabled simultaneously**. Disabling any of them blacks out a face. |
+
+**Why this isn't just `cam.targetDisplay = N` in a prefab:** `CubeRigController.RebuildRig` tears down and recreates the side camera GameObjects whenever cube dimensions change (monitor selection, edit-mode tweaks, runtime resize). Anything serialized on the prefab Camera is lost on the next rebuild. So the SDK assigns `targetDisplay` **procedurally** in `CubeRigController.ApplyTargetDisplaysToCameras`, called automatically from inside `RebuildRig`. You cannot set it from inspector and expect it to stick.
+
+**Switching modes:**
+- Set `CubeRuntimeConfig.displayMode` on the runtime config asset. Most projects keep two assets — `CubeRuntimeConfig_PC.asset` (`SingleDisplay`) and `CubeRuntimeConfig_Cabinet.asset` (`MultiDisplayCabinet`) — and select per build via the `CubeRigController.runtimeConfig` slot or a build pre-process hook.
+- In `MultiDisplayCabinet` mode, `CubeRigController.RebuildRig` calls `Display.displays[i].Activate()` for every non-primary display referenced by the side mapping. Unity does **not** activate Displays 2..4 automatically — without this you get a black screen on every monitor except the primary.
+
+**The Editor never runs `MultiDisplayCabinet`.** Developers iterate on a single-monitor PC workstation, so editor play mode always runs against a `CubeRuntimeConfig` whose `displayMode = SingleDisplay`: all four side cameras render to Display 1, and per-station preview is achieved by enabling one camera at a time. There is no need (and no benefit) to retarget the Game window's Display dropdown in editor — the focused-camera approach handles preview entirely upstream of any display-routing logic. `MultiDisplayCabinet` is exclusively a **player-build** concern: the cabinet OS runs the standalone player against a `MultiDisplayCabinet` config, each side camera is pinned to its own physical monitor, and `Display.Activate()` brings the non-primary displays online at startup.
+
+**Tasks for v0.1.x:**
+- [x] Add `CubeDisplayMode` enum and `displayMode` / per-side display index fields to `CubeRuntimeConfig`.
+- [x] Procedurally assign `Camera.targetDisplay` in `CubeRigController.RebuildRig` so the cabinet mapping survives every rig rebuild.
+- [x] Activate non-primary `UnityEngine.Display` instances at startup in `MultiDisplayCabinet` mode (player builds only; no-op in editor).
+- [ ] Provide an SDK build pre-process script that lets a project select `SingleDisplay` vs `MultiDisplayCabinet` per build target without manually swapping config assets (low priority — current asset-swap workflow is fine for v0.1.x).
+- [ ] Add a HoloCade test scene + PlayMode test that flips the runtime config from `SingleDisplay` → `MultiDisplayCabinet` and asserts (a) all four side cameras have unique `targetDisplay` values, (b) `RebuildRig` reapplies them, (c) `Display.Activate` is called for every non-primary index referenced (player build smoke test, gated on `Application.isEditor == false`).
+
+#### Omni-Text Rendering (planned)
+
+Cube games inherit a hard rule from the Cube's omnidirectional viewing geometry: **a single shared text mesh placed in the cube volume will always be facing away from at least one of the four players**. Any text that is meant to be readable from every station must therefore be rendered as **N independent oriented instances** (one per active station), each visible only to its own station camera. This is a Cube-wide concern (lobby/jumbotron, in-game HUD, post-match results, error/notice text, debug overlays, etc.), so the SDK owns the primitive rather than each title re-implementing it.
+
+**Goals:**
+- Authoring stays single-instance: a game author drops one logical "omni text" element into the scene and the SDK fans it out to N station-facing instances.
+- Per-station visibility is enforced by camera culling masks so the four instances cannot bleed into each other's views.
+- Backend is interchangeable: the same omni-text primitive can be backed by **TextMeshPro** (default; cheap, dynamic, fits HUD/countdown/score) or **3D extruded geometry text** (for jumbotron-grade titles, prizes, marquee elements where mesh depth/lighting matters).
+
+**Tasks:**
+
+- [ ] Define a `HoloCade.Cube.IOmniTextElement` contract that exposes a single logical spec (string, font/asset, alignment, world placement, rotation policy) and a backend selector (`TextMeshPro` | `Extruded3D`).
+- [ ] Add a `HoloCade.Cube.OmniTextFan` (`MonoBehaviour`) that, given a logical spec and the active `CubeRigController` station set, instantiates one oriented child per station, parents them under a single transform at the requested cube-space position, and rotates each child to face the corresponding station camera. `OmniTextFan` is the only thing game code is expected to interact with directly.
+- [ ] Add station UI rendering layers to the SDK (`OmniText_Station_N`, `OmniText_Station_S`, `OmniText_Station_E`, `OmniText_Station_W` — extend if 6/8-side configs land later) and have `CubeSideCameraController` (or a sibling helper) configure each station camera's `cullingMask` so it sees exactly its own station-text layer. Document the layer numbers as part of the SDK contract so titles and CI scenes don't pick conflicting ones.
+- [ ] Ship an **`OmniText` drop-in prefab** with two pre-wired variants:
+  - `OmniText_TMP.prefab` — TextMeshPro-backed, recommended default for HUDs, countdowns, scores, status text.
+  - `OmniText_Mesh3D.prefab` — 3D extruded geometry text variant for jumbotron-grade titles, prize callouts, attract-mode marquee text. The variant ships as a thin wrapper over the chosen 3D-text plugin (see "Backend recommendation" below) so titles can swap the backend asset later without changing call sites.
+- [ ] In `CubeRigController` / `CubeRuntimeConfig`, expose an `omniTextStationLayerMap` so 2-player and 4-player rigs both wire up correctly without each title re-doing the mask plumbing.
+- [ ] Add a HoloCade-side test scene + PlayMode test that drops an `OmniText_TMP` element into the cube center and asserts: from each station camera, exactly one instance of the text element is rendered, the other instances are culled by layer mask, and the visible instance's forward axis points at that station's camera within tolerance.
+- [ ] Update the SDK examples / quick-start so any HoloCade title that needs Cube-visible text uses `OmniText` rather than placing a raw TMP/3D-text asset directly into the cube volume. Migrate existing samples that violate this rule.
+
+**Backend recommendation (3D extruded geometry text):**
+
+There is no clear universally-adopted free Unity plugin for 3D extruded geometry text. The realistic options are:
+
+- **Typogenic** (open-source, MIT) — SDF-based, fast, free, but archived in 2017; works with current Unity in practice but is unmaintained. Acceptable as the initial `OmniText_Mesh3D` backend if we accept maintenance risk.
+- **UnityTextDrawer** (open-source, MIT) — wraps TextMeshPro to draw 3D text with one call; not true extruded geometry, but a reasonable middle-ground if we only need depth/lighting on a TMP-style mesh.
+- **Dynamic 3D Text by Strobotnik** (paid Asset Store) — true runtime extruded TTF/OTF mesh generation with bevel and ligatures; the most feature-complete option for the jumbotron use case.
+- **3D Text Lite** (paid Asset Store, ~$15) — text-mesh generation utility, lighter feature set than Strobotnik.
+
+Default plan: ship `OmniText_Mesh3D` against **Typogenic** for the open-source baseline so the SDK has zero paid dependencies, but keep the `IOmniTextElement` backend selector open so titles that need higher fidelity can drop in **Dynamic 3D Text** without changing any call site. Re-evaluate if Typogenic breaks against a future Unity LTS.
 
 </blockquote>
 
@@ -3775,6 +3831,31 @@ For any experience running one year or longer, HoloCade's author recommends cons
   - **WristButton_ECU**: Wireless trigger button controller for AIFacemaskExperience (embedded in live actor costumes, battery-powered, WiFi/Bluetooth communication)
   - **MovingPlatform_ECU**: Motion platform controller for MovingPlatformExperience (similar to GunshipExperience_ECU, uses same 4-gang actuator system, single-player standing platform)
   - **CarSim_ECU**: Motion platform controller for CarSimExperience (similar to GunshipExperience_ECU, uses same 4-gang actuator system, optimized for driving simulation motion profiles)
+
+#### Cube Module — CubeEmulator (2-camera dev harness)
+
+> Goal: let developers validate Cube gameplay + passthrough integration **before** having 8 production cameras. The emulator uses **one dev monitor** as the active “station” plus **two flank cameras** (Left/Right) that can be mapped across all four Cube quadrants for early HyperCube + Unity loopback testing.
+
+- [ ] **CubeEmulator component** - Add a `CubeEmulator` MonoBehaviour (Cube module) that can be enabled in **Editor Play Mode** or in a **build**.
+- [ ] **Station toggle (P1→P4)** - Provide a hotkey/UI toggle that cycles **P1/P2/P3/P4**:
+  - updates the **active control station** (input routing)
+  - updates the **active viewport** / “operator view” so a single monitor can preview each side’s view deterministically
+- [ ] **Two-camera mapping mode** - Provide an emulator mode that assigns two physical cameras (Left/Right) to the full Cube passthrough contract:
+  - publish an **8-slot logical feed** as `L,R,L,R,L,R,L,R`
+  - ensure HyperCube can map that stereo pair into all **four passthrough quadrants** for early validation
+- [ ] **Non-invasive to production rig** - Emulator should be opt-in and should not change the default 4-side Cube runtime behavior when disabled.
+- [ ] **Documentation** - Add a short “CubeEmulator quickstart” section in `Runtime/Cube/CUBE_MODULE_README.md` describing:
+  - required scene components
+  - how to toggle stations
+  - how to pair with HyperCube in 2-camera mode
+
+#### Cube Module — Equirect / sphere display (replaces temp portal path)
+
+> **Context:** `CubeBase` today uses **flat portal quads** + **TCP JPEG** passthrough for dev. That wiring is **intentionally temporary**; once HyperCube produces **equirectangular** (or per-quadrant spherical) output, passthrough should render on **procedural interior sphere** geometry (inward normals), not stretched quads.
+
+- [ ] **Procedural interior sphere (or four 90° segments / octants)** - Build mesh + UV layout in the Cube module so each incoming quadrant (or equirect layer) maps to the correct **UV region** for omni-passthrough on a sphere. Support **Editor Play Mode** and **builds** when enabled.
+- [ ] **Prefab integration** - Replace or switch from **temporary** portal + render-target setup in `CubeBase` to the sphere path behind a **clear toggle** or **pluggable display backend** so rectilinear loopback keeps working until stitch+comp ships.
+- [ ] **Doc + HyperCube cross-link** - Document the wire format / UV convention next to `HoloCade_HyperCube` milestones **v0.1.0** (stand-in 360 crops) and **v0.2.0+** (GPU equirect).
 
 </blockquote>
 

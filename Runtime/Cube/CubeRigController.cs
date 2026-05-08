@@ -16,7 +16,7 @@ namespace HoloCade.Cube
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
-    public class CubeRigController : MonoBehaviour, ICubeDisplayAspect
+    public class CubeRigController : MonoBehaviour, ICubeDisplayAspect, ICubeStationCameraSource
     {
         [SerializeField] CubeRuntimeConfig runtimeConfig;
         [Header("Monitor Selection")]
@@ -33,6 +33,7 @@ namespace HoloCade.Cube
         [SerializeField] bool drawCameraCentersInScene = true;
         [SerializeField] bool drawCameraFrustumsInScene = true;
         [SerializeField, Min(0f)] float debugFrustumDepth = 0f;
+        [SerializeField] bool disableVSyncInPlayMode = false;
 
         readonly Dictionary<CubeSide, Renderer> _portalRendererBySide = new Dictionary<CubeSide, Renderer>();
         readonly Dictionary<CubeSide, CubeSideCameraController> _cameraControllerBySide = new Dictionary<CubeSide, CubeSideCameraController>();
@@ -134,8 +135,34 @@ namespace HoloCade.Cube
             BuildFrame();
             ApplyPassthroughTextures();
 
+            // Multi-display targeting MUST be re-applied on every rebuild because BuildSide tears
+            // down and recreates the Camera components from scratch. Doing it here (vs. inside
+            // BuildSide) keeps the per-side targetDisplay logic in one place and guarantees the
+            // cabinet wiring isn't lost the next time monitor selection changes.
+            ApplyTargetDisplaysToCameras();
+            if (Application.isPlaying)
+                ActivateExtraDisplaysIfNeeded();
+
             _lastEffectiveDimensions = GetEffectiveCubeDimensions();
             _lastSelectedMonitorIndex = selectedMonitorIndex;
+        }
+
+        /// <summary>
+        /// Display mode resolved from the runtime config; falls back to <see cref="CubeDisplayMode.SingleDisplay"/>
+        /// when no config is present so consumers can branch without null-guarding.
+        /// </summary>
+        public CubeDisplayMode ResolvedDisplayMode =>
+            runtimeConfig != null ? runtimeConfig.displayMode : CubeDisplayMode.SingleDisplay;
+
+        /// <summary>
+        /// 0-based <c>UnityEngine.Display</c> index assigned to <paramref name="side"/>'s camera, taking
+        /// the current <see cref="CubeDisplayMode"/> into account. SingleDisplay always returns 0.
+        /// </summary>
+        public int GetCameraTargetDisplayForSide(CubeSide side)
+        {
+            if (runtimeConfig == null || runtimeConfig.displayMode == CubeDisplayMode.SingleDisplay)
+                return 0;
+            return runtimeConfig.GetDisplayIndexForSide(side);
         }
 
         public void ApplyPassthroughTextures()
@@ -155,6 +182,12 @@ namespace HoloCade.Cube
         {
             if (rebuildOnAwake)
                 RebuildRig();
+
+            if (Application.isPlaying && disableVSyncInPlayMode)
+            {
+                QualitySettings.vSyncCount = 0;
+                Application.targetFrameRate = -1;
+            }
         }
 
         void LateUpdate()
@@ -171,8 +204,10 @@ namespace HoloCade.Cube
             selectedMonitorIndex = Mathf.Max(0, selectedMonitorIndex);
             debugFrustumDepth = Mathf.Max(0f, debugFrustumDepth);
 
+#if UNITY_EDITOR
             if (!Application.isPlaying && liveUpdateInEditMode && isActiveAndEnabled)
                 QueueEditorSafeRebuild();
+#endif
         }
 
         void BuildSide(CubeSide side)
@@ -222,10 +257,28 @@ namespace HoloCade.Cube
             var renderer = portal.GetComponent<Renderer>();
             if (renderer != null)
             {
-                if (runtimeConfig.passthroughMaterialTemplate != null)
-                    renderer.sharedMaterial = new Material(runtimeConfig.passthroughMaterialTemplate);
+                // Always give portals a unique Material instance. If we leave the built-in Default
+                // Material on the quad, assigning mainTexture via ApplyPassthroughTextures mutates the
+                // shared default asset and every other primitive on that material (floor, ceiling,
+                // frame columns) will show the same camera feed texture.
+                renderer.sharedMaterial = CreatePortalMaterialInstance();
                 _portalRendererBySide[side] = renderer;
             }
+        }
+
+        Material CreatePortalMaterialInstance()
+        {
+            if (runtimeConfig.passthroughMaterialTemplate != null)
+                return new Material(runtimeConfig.passthroughMaterialTemplate);
+
+            var shader = Shader.Find("Unlit/Texture");
+            if (shader == null)
+                shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null)
+                shader = Shader.Find("HDRP/Unlit");
+            if (shader == null)
+                shader = Shader.Find("Standard");
+            return new Material(shader) { name = "PassthroughPortal_Auto" };
         }
 
         void BuildFloor()
@@ -396,6 +449,41 @@ namespace HoloCade.Cube
             {
                 if (markers[i] != null)
                     DestroyImmediate(markers[i].gameObject);
+            }
+        }
+
+        void ApplyTargetDisplaysToCameras()
+        {
+            foreach (var kvp in _cameraControllerBySide)
+            {
+                if (kvp.Value == null) continue;
+                var cam = kvp.Value.SideCamera;
+                if (cam == null) continue;
+                cam.targetDisplay = GetCameraTargetDisplayForSide(kvp.Key);
+            }
+        }
+
+        void ActivateExtraDisplaysIfNeeded()
+        {
+            if (runtimeConfig == null) return;
+            if (runtimeConfig.displayMode != CubeDisplayMode.MultiDisplayCabinet) return;
+            if (!runtimeConfig.activateExtraDisplaysInBuild) return;
+
+            // Display.Activate is a player-only API; in the Editor only Display.displays[0] is real
+            // and Activate() on others is a no-op (or warns). The viewport router still needs to
+            // tell the Editor Game window which display to *show*, but that path is handled by the
+            // editor reflection helper, not by this method.
+            if (Application.isEditor) return;
+
+            var displays = Display.displays;
+            for (var i = 1; i < displays.Length && i < 8; i++)
+            {
+                var anySideUses = runtimeConfig.northDisplayIndex == i
+                                  || runtimeConfig.southDisplayIndex == i
+                                  || runtimeConfig.eastDisplayIndex == i
+                                  || runtimeConfig.westDisplayIndex == i;
+                if (anySideUses)
+                    displays[i].Activate();
             }
         }
 

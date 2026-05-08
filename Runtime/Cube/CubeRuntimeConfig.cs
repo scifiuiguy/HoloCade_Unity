@@ -60,10 +60,40 @@ namespace HoloCade.Cube
         [Min(0f)] public float floorOffset = -0.001f;
         [Min(0f)] public float ceilingOffset = 0.001f;
 
+        [Header("Display Output")]
+        [Tooltip("SingleDisplay = all side cameras render to Display 1 and a viewport router is expected to enable exactly one at a time (Editor / PC test builds). MultiDisplayCabinet = each side camera is pinned to its own physical display (production cabinet build).")]
+        public CubeDisplayMode displayMode = CubeDisplayMode.SingleDisplay;
+        [Tooltip("0-based UnityEngine.Display index for the North-side camera in MultiDisplayCabinet mode.")]
+        [Range(0, 7)] public int northDisplayIndex = 0;
+        [Tooltip("0-based UnityEngine.Display index for the South-side camera in MultiDisplayCabinet mode.")]
+        [Range(0, 7)] public int southDisplayIndex = 1;
+        [Tooltip("0-based UnityEngine.Display index for the East-side camera in MultiDisplayCabinet mode.")]
+        [Range(0, 7)] public int eastDisplayIndex = 2;
+        [Tooltip("0-based UnityEngine.Display index for the West-side camera in MultiDisplayCabinet mode.")]
+        [Range(0, 7)] public int westDisplayIndex = 3;
+        [Tooltip("If true (and displayMode = MultiDisplayCabinet), Display.displays[i].Activate() is called for each non-primary display referenced by the side mapping. Has no effect in the Editor.")]
+        public bool activateExtraDisplaysInBuild = true;
+
+        public int GetDisplayIndexForSide(CubeSide side)
+        {
+            switch (side)
+            {
+                case CubeSide.North: return Mathf.Clamp(northDisplayIndex, 0, 7);
+                case CubeSide.South: return Mathf.Clamp(southDisplayIndex, 0, 7);
+                case CubeSide.East:  return Mathf.Clamp(eastDisplayIndex, 0, 7);
+                case CubeSide.West:  return Mathf.Clamp(westDisplayIndex, 0, 7);
+                default: return 0;
+            }
+        }
+
         void OnValidate()
         {
             passthroughTextureAspectWidth = Mathf.Max(0.01f, passthroughTextureAspectWidth);
             passthroughTextureAspectHeight = Mathf.Max(0.01f, passthroughTextureAspectHeight);
+            northDisplayIndex = Mathf.Clamp(northDisplayIndex, 0, 7);
+            southDisplayIndex = Mathf.Clamp(southDisplayIndex, 0, 7);
+            eastDisplayIndex = Mathf.Clamp(eastDisplayIndex, 0, 7);
+            westDisplayIndex = Mathf.Clamp(westDisplayIndex, 0, 7);
         }
     }
 }
