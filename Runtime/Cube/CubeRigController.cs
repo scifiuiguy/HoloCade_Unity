@@ -44,6 +44,14 @@ namespace HoloCade.Cube
         bool _isRebuildQueuedFromValidate;
 #endif
 
+        /// <summary>
+        /// Read-only access to the runtime config currently driving this rig. Downstream
+        /// components (e.g. <see cref="OmniTextElement"/>) consume this to read OmniText station
+        /// layer indices without re-serializing the same reference. May be null until the
+        /// inspector field is assigned.
+        /// </summary>
+        public CubeRuntimeConfig RuntimeConfig => runtimeConfig;
+
         public bool TryGetPortalRenderer(CubeSide side, out Renderer renderer)
         {
             return _portalRendererBySide.TryGetValue(side, out renderer);
@@ -515,25 +523,27 @@ namespace HoloCade.Cube
         int BuildCameraCullingMask(CubeSide side)
         {
             var mask = runtimeConfig.sideCameraCullingMask.value;
-            if (!runtimeConfig.cullOrthogonalPortalFeeds)
-                return mask;
 
-            mask &= ~(1 << runtimeConfig.northPortalLayer);
-            mask &= ~(1 << runtimeConfig.southPortalLayer);
-            mask &= ~(1 << runtimeConfig.eastPortalLayer);
-            mask &= ~(1 << runtimeConfig.westPortalLayer);
-
-            if (CubeSideUtility.IsNorthSouthPair(side))
+            if (runtimeConfig.cullOrthogonalPortalFeeds)
             {
-                mask |= 1 << runtimeConfig.northPortalLayer;
-                mask |= 1 << runtimeConfig.southPortalLayer;
-            }
-            else
-            {
-                mask |= 1 << runtimeConfig.eastPortalLayer;
-                mask |= 1 << runtimeConfig.westPortalLayer;
+                mask &= ~(1 << runtimeConfig.northPortalLayer);
+                mask &= ~(1 << runtimeConfig.southPortalLayer);
+                mask &= ~(1 << runtimeConfig.eastPortalLayer);
+                mask &= ~(1 << runtimeConfig.westPortalLayer);
+
+                if (CubeSideUtility.IsNorthSouthPair(side))
+                {
+                    mask |= 1 << runtimeConfig.northPortalLayer;
+                    mask |= 1 << runtimeConfig.southPortalLayer;
+                }
+                else
+                {
+                    mask |= 1 << runtimeConfig.eastPortalLayer;
+                    mask |= 1 << runtimeConfig.westPortalLayer;
+                }
             }
 
+            mask = OmniTextStationLayers.ApplyStationCulling(mask, side, runtimeConfig);
             return mask;
         }
 

@@ -1,0 +1,22 @@
+{
+  "name": "HoloCade.Tests.Editor",
+  "rootNamespace": "HoloCade.Tests.Editor",
+  "references": [
+    "HoloCade.Runtime",
+    "Unity.TextMeshPro"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

@@ -22,6 +22,15 @@ Use this tree for context: Root → Runtime Modules → Templates/Hardware. Prio
 - **Cursor** may append `Co-authored-by: Cursor <cursoragent@cursor.com>` via a Git **`prepare-commit-msg`** hook when **Agent attribution** is enabled. The user should turn that off in **Cursor Settings** (**Ctrl+Shift+J** on Windows, or Command Palette → “Cursor Settings”) under **Agent / attribution** (exact labels vary by version); **restart Cursor** after toggling.
 - **`git commit --no-verify` does not skip `prepare-commit-msg`.** To amend a message **without** hooks re-injecting trailers (e.g. cleaning history), use an **empty hooks path** for that invocation only, e.g. `git -c core.hooksPath=/path/to/empty_dir commit --amend -m "…"` (create a directory with **no** hook scripts). Do not permanently disable the project’s `.git/hooks` unless the user asks.
 
+### Milestone version tags (SOP)
+
+- **Tags mark completion, not initiation.** A milestone version tag (e.g. `v0.1.0`) is an **immutable** pointer to the commit that **completes** that milestone — never the commit where work toward it begins. In-progress tracking belongs in the README's roadmap / milestone checklist, not in tags.
+- **When the user says "tag the latest version number"** (or equivalent wording such as "tag X.Y.Z", "cut the X.Y.Z tag", "release X.Y.Z"), interpret it as: **the current `HEAD` of `main` is the commit that completes the named milestone** — create an annotated tag at `HEAD` and push it.
+  - Default to a `v`-prefixed tag (`v0.1.0`) to match SemVer convention and the rest of the repo's tag history; only deviate if the user specifies otherwise or the repo's existing tag history is consistently un-prefixed.
+  - Pre-release work toward the same milestone may use SemVer pre-release suffixes (`v0.1.0-alpha.1`, `v0.1.0-beta.1`, `v0.1.0-rc.1`) on intermediate commits if the user explicitly requests them; the final `v0.1.0` tag still marks completion.
+- **Never move an existing public tag** without an explicit "force-move tag X" / "move tag X to HEAD" / "force-push tag X" instruction from the user. If a tag of the requested name already exists on the remote pointing at an older commit, **stop and surface that fact** rather than retargeting it (force-pushing tags rewrites public history and breaks anyone who already pulled them).
+- **Annotated tags only for milestones.** Use `git tag -a vX.Y.Z -m "..."` (not lightweight tags) so the tag carries a message and a tagger date. Push with `git push origin vX.Y.Z`.
+
 ## Table of Contents
 
 ### The Main Project README

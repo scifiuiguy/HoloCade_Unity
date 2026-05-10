@@ -6,7 +6,8 @@
         "Unity.Netcode.Runtime",
         "Unity.XR.Management",
         "Unity.XR.OpenXR",
-        "Unity.XR.Hands"
+        "Unity.XR.Hands",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

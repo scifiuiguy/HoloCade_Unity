@@ -237,7 +237,7 @@ HoloCade requires several Unity packages. These are **automatically installed** 
 | **OpenXR Plugin** | 1.9.0+ | Cross-platform VR support (required for HMD and hand tracking) | `com.unity.xr.openxr` |
 | **XR Hands** | 1.3.0+ | Hand tracking support (required for gesture recognition) | `com.unity.xr.hands` |
 | **Input System** | 1.7.0+ | Modern input handling | `com.unity.inputsystem` |
-| **TextMeshPro** | 3.0.6+ | UI text rendering | `com.unity.textmeshpro` |
+| **uGUI (Unity UI + TextMeshPro)** | 2.0.0+ | UI framework + TextMeshPro for `OmniTextElement` and other in-cube text rendering. On Unity 6 LTS, `com.unity.ugui` includes the TMP runtime; legacy projects can use `com.unity.textmeshpro` 3.0.6+ instead. | `com.unity.ugui` |
 
 > **⚠️ OpenXR Requirement:** HoloCade uses OpenXR exclusively for all HMD and hand tracking. Your HMD must support OpenXR (most modern VR headsets do, including Meta Quest, Windows Mixed Reality, and SteamVR-compatible headsets via OpenXR). If your deployment requires a different XR SDK, you will need to customize the HMD/hand tracking components. See the main Overview section for details.
 
@@ -1978,6 +1978,40 @@ Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
 - Keep shared packet transport and cabinet topology configuration in HoloCade SDK
 - Implement title-specific control semantics (e.g. Up/Down meaning, game state transitions) in title code
 
+#### Free Play Mode (planned)
+
+> **Why this lives in the SDK, not in titles.** Operator-toggleable Free Play is a venue-management concern that **every** cabinet title eventually needs (location operators run free-play days, dev/QA work bypasses card readers, museum / private-event installs may run permanently free). Re-implementing it per title would guarantee inconsistent behavior across the HoloCade catalog. The Cabinet module owns the topology — credits live here in `ArcadeCabinetIOConfig`, the bridge already fires `OnSharedCoinPulse` / `OnSharedCardPulse` / `OnPlayerCoinPulse` / `OnPlayerCardPulse` — so it is also the right place to own the "**no credits required**" override.
+
+**Goals:**
+- A single SDK-level toggle that lobbies / credit gates across **any** HoloCade title can read; no per-title duplication of "is free play on?" logic.
+- Operator-friendly UX: titles render a clear `FREE PLAY` indicator (instead of a numeric credit count) so players understand the cabinet is open, and "Start" presses are honored without a swipe / coin pulse.
+- Cleanly defined contract with credit topology (shared vs per-player) so titles don't have to special-case Free Play deep in their state machines.
+
+**Tasks:**
+
+- [ ] Extend `ArcadeCabinetIOConfig` with a `freePlayEnabled` boolean field (default `false`) plus a runtime accessor on `ArcadeCabinetBridge` (`bool IsFreePlayEnabled { get; }`) so titles read one symbol regardless of where the toggle was flipped.
+- [ ] Add a runtime override path: `ArcadeCabinetBridge.SetFreePlayOverride(bool enabled)` for editor / diagnostics / operator-menu toggling without re-importing the ScriptableObject. Surface via `CabinetDiagnosticsHost` so service mode can flip it on-cabinet.
+- [ ] Define a Cabinet-module **credit policy interface** that Free Play implements alongside the existing card/coin path:
+  - `ICabinetCreditPolicy.TryClaimCredit(int slot, out CreditClaimResult result)` — title-side lobbies call this on each Start press; the policy decides whether the press is honored.
+  - In **paid** mode the policy reads `availableCoinCredits` from the title's lobby pool and returns `Claimed` / `Rejected` accordingly.
+  - In **free-play** mode the policy returns `Claimed` unconditionally (no pool read, no decrement).
+- [ ] Define a `CabinetCreditDisplayMode` enum returned by the policy so titles render the correct indicator without re-checking the toggle: `Numeric` (paid mode, render the integer pool) vs `FreePlay` (render localized "FREE PLAY" copy).
+- [ ] Reference `KeyboardCabinetCreditSource` adapter (editor-only) gains a free-play passthrough so dev workflows don't need swipe-key spam.
+- [ ] Operator-menu integration sketch (deferred to the operator-menu milestone, but link the contract from here so the Free Play surface is part of the same task graph): the operator menu reads / writes `ArcadeCabinetIOConfig.freePlayEnabled` and persists across power cycles. Until that menu lands, Free Play is editable in the inspector + via the diagnostics override.
+- [ ] Cabinet diagnostics page: `CabinetDiagnosticsHost` adds a "Credits & Free Play" tab showing the live mode (paid / free-play), pool count if paid, last credit-event timestamp, and a toggle for Free Play override (gated behind a service-mode check).
+- [ ] Test scene + EditMode tests: build a fake `ArcadeCabinetBridge` + paid-mode policy and assert Start presses are rejected when pool is empty; flip Free Play on and assert the same Start presses are accepted with `Claimed` and `CabinetCreditDisplayMode.FreePlay`.
+
+**Title-side contract (for HoloSnake and any future cabinet title):**
+
+- Titles **must** consume credit decisions through `ICabinetCreditPolicy.TryClaimCredit`, not by reading their own `availableCoinCredits` pool directly inside the lobby state machine. The pool itself remains title-owned (it's a `LobbyController` concern), but **whether a Start press counts** is an SDK decision.
+- Titles **must** render the credit indicator using `CabinetCreditDisplayMode` so all HoloCade cabinets show consistent Free Play UX.
+- Titles **may** still own per-game rules (e.g. "one credit per station per session", "credits persist between lobbies", win-condition unlocks), as long as those rules apply **after** the SDK-level credit decision.
+
+**Out of scope for this task block (deferred):**
+- Operator-menu UI itself (lives in its own milestone alongside other cabinet-service flows).
+- Persistence of operator settings to disk (cabinet-service milestone).
+- Time-window scheduling ("free play 5-7pm only") — out of scope; if needed, build on top of `freePlayEnabled` later.
+
 </blockquote>
 
 </details>
@@ -2040,7 +2074,7 @@ The Cube ships in two physical configurations and the SDK has to support both fr
 - [ ] Provide an SDK build pre-process script that lets a project select `SingleDisplay` vs `MultiDisplayCabinet` per build target without manually swapping config assets (low priority — current asset-swap workflow is fine for v0.1.x).
 - [ ] Add a HoloCade test scene + PlayMode test that flips the runtime config from `SingleDisplay` → `MultiDisplayCabinet` and asserts (a) all four side cameras have unique `targetDisplay` values, (b) `RebuildRig` reapplies them, (c) `Display.Activate` is called for every non-primary index referenced (player build smoke test, gated on `Application.isEditor == false`).
 
-#### Omni-Text Rendering (planned)
+#### Omni-Text Rendering (TMP slice active; 3D extruded variant planned)
 
 Cube games inherit a hard rule from the Cube's omnidirectional viewing geometry: **a single shared text mesh placed in the cube volume will always be facing away from at least one of the four players**. Any text that is meant to be readable from every station must therefore be rendered as **N independent oriented instances** (one per active station), each visible only to its own station camera. This is a Cube-wide concern (lobby/jumbotron, in-game HUD, post-match results, error/notice text, debug overlays, etc.), so the SDK owns the primitive rather than each title re-implementing it.
 
@@ -2049,17 +2083,78 @@ Cube games inherit a hard rule from the Cube's omnidirectional viewing geometry:
 - Per-station visibility is enforced by camera culling masks so the four instances cannot bleed into each other's views.
 - Backend is interchangeable: the same omni-text primitive can be backed by **TextMeshPro** (default; cheap, dynamic, fits HUD/countdown/score) or **3D extruded geometry text** (for jumbotron-grade titles, prizes, marquee elements where mesh depth/lighting matters).
 
-**Tasks:**
+**Architecture (TMP slice, shipped):**
 
-- [ ] Define a `HoloCade.Cube.IOmniTextElement` contract that exposes a single logical spec (string, font/asset, alignment, world placement, rotation policy) and a backend selector (`TextMeshPro` | `Extruded3D`).
-- [ ] Add a `HoloCade.Cube.OmniTextFan` (`MonoBehaviour`) that, given a logical spec and the active `CubeRigController` station set, instantiates one oriented child per station, parents them under a single transform at the requested cube-space position, and rotates each child to face the corresponding station camera. `OmniTextFan` is the only thing game code is expected to interact with directly.
-- [ ] Add station UI rendering layers to the SDK (`OmniText_Station_N`, `OmniText_Station_S`, `OmniText_Station_E`, `OmniText_Station_W` — extend if 6/8-side configs land later) and have `CubeSideCameraController` (or a sibling helper) configure each station camera's `cullingMask` so it sees exactly its own station-text layer. Document the layer numbers as part of the SDK contract so titles and CI scenes don't pick conflicting ones.
-- [ ] Ship an **`OmniText` drop-in prefab** with two pre-wired variants:
-  - `OmniText_TMP.prefab` — TextMeshPro-backed, recommended default for HUDs, countdowns, scores, status text.
-  - `OmniText_Mesh3D.prefab` — 3D extruded geometry text variant for jumbotron-grade titles, prize callouts, attract-mode marquee text. The variant ships as a thin wrapper over the chosen 3D-text plugin (see "Backend recommendation" below) so titles can swap the backend asset later without changing call sites.
-- [ ] In `CubeRigController` / `CubeRuntimeConfig`, expose an `omniTextStationLayerMap` so 2-player and 4-player rigs both wire up correctly without each title re-doing the mask plumbing.
-- [ ] Add a HoloCade-side test scene + PlayMode test that drops an `OmniText_TMP` element into the cube center and asserts: from each station camera, exactly one instance of the text element is rendered, the other instances are culled by layer mask, and the visible instance's forward axis points at that station's camera within tolerance.
+```
++----------------------------+         +-----------------------------+
+|  Title (HoloSnake)         |         |  HoloCade.Cube              |
+|  e.g. lobby UI             |         |  CubeRigController          |
+|                            |  uses   |  └─ TryGetSideCamera(side)  |
+|  IOmniTextElement          | <-----> |     (ICubeStationCameraSource)
+|  element.Text = "5"        |         |  └─ RuntimeConfig (read-only)
++----------------------------+         +-----------------------------+
+            |                                |
+            | parents under                  | reads OmniText layer
+            v                                | indices per side
++--------------------------------+           |
+|  HoloCade.Cube.OmniTextElement |-----------+
+|  (TextMeshPro backend)         |
+|                                |  spawns 1 child per CubeSide
+|  ├─ OmniText_North (TMP)       |  layer = config.northOmniTextLayer
+|  ├─ OmniText_South (TMP)       |  layer = config.southOmniTextLayer
+|  ├─ OmniText_East  (TMP)       |  layer = config.eastOmniTextLayer
+|  └─ OmniText_West  (TMP)       |  layer = config.westOmniTextLayer
++--------------------------------+
+            ^
+            | each station camera's cullingMask is masked so only
+            | its own OmniText layer is visible (subtractive: other
+            | layers stay untouched). See OmniTextStationLayers.
+```
+
+**Default station layer numbers:**
+
+| Side | `CubeRuntimeConfig` field | Default layer index |
+|---|---|---|
+| North | `northOmniTextLayer` | `20` |
+| South | `southOmniTextLayer` | `21` |
+| East  | `eastOmniTextLayer`  | `22` |
+| West  | `westOmniTextLayer`  | `23` |
+
+These avoid the default portal layers (`24..27`) and Unity's reserved layers (`0..7`). The fields are `[Range(0, 31)]` so titles may rebind to any other free index. Naming the four layers `OmniText_Station_N/S/E/W` in the project's `TagManager` is **optional** — the SDK works on integer indices alone.
+
+**Per-station culling toggle:**
+
+`CubeRuntimeConfig.enableOmniTextStationCulling` (default `true`) controls the subtractive mask logic in `CubeRigController.BuildCameraCullingMask`. When `true`, each side camera's mask is transformed so the three opposing-station OmniText layers are filtered out and the camera's own OmniText layer is included. When `false`, the per-station culling pass is skipped entirely (useful for diagnostic captures that want to see all four oriented instances at once).
+
+**Tasks (TMP-backed slice — **shipped** as the v0.1.1 unblocking gate):**
+
+- [x] Define a `HoloCade.Cube.IOmniTextElement` contract (`Runtime/Cube/OmniText/IOmniTextElement.cs`) that exposes the logical text/color/transform surface and a `Rebuild()` hook for post-rig-rebuild re-resolution.
+- [x] Add a `HoloCade.Cube.OmniTextElement` (`MonoBehaviour`, `Runtime/Cube/OmniText/OmniTextElement.cs`) that auto-discovers the scene's `CubeRigController` (parent walk first, scene-wide fallback second) and the rig's `RuntimeConfig`, then instantiates one `TextMeshPro` child per active station, parents them under its own transform, assigns each child to that side's OmniText layer, and applies a **fixed per-side yaw** at spawn (`North` 0°, `East` 90°, `South` 180°, `West` 270° on local Y, plus optional `flipFacing` +180°). `Rebuild()` still requires a non-null `ICubeStationCameraSource` (the rig or `SetStationCameraSource`) and `CubeRuntimeConfig` so layer indices resolve; orientation does **not** track live camera transforms. Component is `[ExecuteAlways]`; station children use `HideFlags.DontSave` so they are not serialized into scenes or prefabs. Tests can inject a stub camera source via `SetStationCameraSource` / `SetRuntimeConfig`.
+- [x] Add per-station layer indices to `CubeRuntimeConfig` (`northOmniTextLayer`/`southOmniTextLayer`/`eastOmniTextLayer`/`westOmniTextLayer`, default `20..23`) and have `CubeRigController.BuildCameraCullingMask` apply the matching per-camera culling via `OmniTextStationLayers.ApplyStationCulling`. The transform is **subtractive** — non-OmniText bits in `sideCameraCullingMask` are preserved.
+- [x] Expose `CubeRuntimeConfig.GetOmniTextLayerForSide(CubeSide)` and the static helper `OmniTextStationLayers` (`LayerIndexForSide`, `UnionMask`, `ApplyStationCulling`) so titles and tests can do their own mask math without re-implementing it.
+- [x] Add EditMode unit coverage (`Tests/Editor/HoloCade.Tests.Editor.asmdef`) with `OmniTextStationLayersTests` (8 cases — pure layer math) and `OmniTextElementTests` (8 cases — per-station spawn, layer assignment, content propagation, idempotent rebuild, missing-config / missing-source guards).
+- [x] Ship drop-in prefab `Runtime/Cube/CubeAssets/OmniText.prefab` (TMP-backed `OmniTextElement` with authored font/material defaults). Instantiate under `[CubeBase]` or drag from the package Cube assets folder; `[ExecuteAlways]` spawns four station children in edit mode for layout preview.
+
+**Tasks (3D extruded backend — planned, not blocking HoloSnake v0.1.1):**
+
+- [ ] `OmniText_Mesh3D.prefab` and matching backend implementing `IOmniTextElement` (see backend recommendation below).
+- [ ] PlayMode test that drops an `OmniText` prefab instance into the cube center and asserts: from each station camera, exactly one instance of the text element is rendered (other layers culled), and the visible instance's forward axis matches the fixed per-side yaw within tolerance. The EditMode tests above cover the layer-and-spawn invariants synthetically; the PlayMode test pairs it with a real `CubeRigController` rebuild + camera render frame.
 - [ ] Update the SDK examples / quick-start so any HoloCade title that needs Cube-visible text uses `OmniText` rather than placing a raw TMP/3D-text asset directly into the cube volume. Migrate existing samples that violate this rule.
+
+**Running the SDK tests from a consumer project:**
+
+The `HoloCade.Tests.Editor` asmdef lives inside the package, so the consumer's `Packages/manifest.json` must list the package as **testable** before Unity's Test Runner surfaces these tests:
+
+```json
+{
+  "dependencies": { "...": "..." },
+  "testables": [
+    "com.ajcampbell.holocade"
+  ]
+}
+```
+
+(`HoloSnake_Unity/Packages/manifest.json` already does this.)
 
 **Backend recommendation (3D extruded geometry text):**
 
@@ -2071,6 +2166,10 @@ There is no clear universally-adopted free Unity plugin for 3D extruded geometry
 - **3D Text Lite** (paid Asset Store, ~$15) — text-mesh generation utility, lighter feature set than Strobotnik.
 
 Default plan: ship `OmniText_Mesh3D` against **Typogenic** for the open-source baseline so the SDK has zero paid dependencies, but keep the `IOmniTextElement` backend selector open so titles that need higher fidelity can drop in **Dynamic 3D Text** without changing any call site. Re-evaluate if Typogenic breaks against a future Unity LTS.
+
+**Title dependencies (active):**
+
+- **HoloSnake v0.1.1** (`Lobby, Cabinet Coin/Credit Flow & Per-Player Button Bindings`) — depends on this primitive for the lobby jumbotron, center "credits" tally, per-quadrant "Ready" badges, countdown digits, and any other cube-visible text. The TMP-backed drop-in is **`Runtime/Cube/CubeAssets/OmniText.prefab`** (`OmniTextElement`). The 3D extruded variant is **not** required for HoloSnake's first cabinet flow and can ship independently.
 
 </blockquote>
 

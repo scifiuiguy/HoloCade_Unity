@@ -52,6 +52,18 @@ namespace HoloCade.Cube
         [Tooltip("Passthrough comp texture height side of the aspect ratio (e.g. 9). Typical wide-angle stereo comp is landscape 16:9.")]
         [Min(0.01f)] public float passthroughTextureAspectHeight = 9f;
 
+        [Header("Omni-Text (per-station text rendering)")]
+        [Tooltip("When enabled, each side camera's culling mask is masked so only its own station's OmniText layer is visible to it (the other three station layers are subtracted). Symmetric with cullOrthogonalPortalFeeds. Set false to disable per-station OmniText culling (e.g. for diagnostic captures that should show all four station instances at once).")]
+        public bool enableOmniTextStationCulling = true;
+        [Tooltip("Layer index for OmniText instances oriented toward the North station camera. Default 20 to avoid collisions with the default portal layers (24-27) and Unity's standard reserved layers.")]
+        [Range(0, 31)] public int northOmniTextLayer = 20;
+        [Tooltip("Layer index for OmniText instances oriented toward the South station camera. Default 21.")]
+        [Range(0, 31)] public int southOmniTextLayer = 21;
+        [Tooltip("Layer index for OmniText instances oriented toward the East station camera. Default 22.")]
+        [Range(0, 31)] public int eastOmniTextLayer = 22;
+        [Tooltip("Layer index for OmniText instances oriented toward the West station camera. Default 23.")]
+        [Range(0, 31)] public int westOmniTextLayer = 23;
+
         [Header("Cabinet Visuals")]
         public Material floorMaterial;
         public Material ceilingMaterial;
@@ -86,6 +98,18 @@ namespace HoloCade.Cube
             }
         }
 
+        public int GetOmniTextLayerForSide(CubeSide side)
+        {
+            switch (side)
+            {
+                case CubeSide.North: return Mathf.Clamp(northOmniTextLayer, 0, 31);
+                case CubeSide.South: return Mathf.Clamp(southOmniTextLayer, 0, 31);
+                case CubeSide.East:  return Mathf.Clamp(eastOmniTextLayer, 0, 31);
+                case CubeSide.West:  return Mathf.Clamp(westOmniTextLayer, 0, 31);
+                default: return Mathf.Clamp(northOmniTextLayer, 0, 31);
+            }
+        }
+
         void OnValidate()
         {
             passthroughTextureAspectWidth = Mathf.Max(0.01f, passthroughTextureAspectWidth);
@@ -94,6 +118,10 @@ namespace HoloCade.Cube
             southDisplayIndex = Mathf.Clamp(southDisplayIndex, 0, 7);
             eastDisplayIndex = Mathf.Clamp(eastDisplayIndex, 0, 7);
             westDisplayIndex = Mathf.Clamp(westDisplayIndex, 0, 7);
+            northOmniTextLayer = Mathf.Clamp(northOmniTextLayer, 0, 31);
+            southOmniTextLayer = Mathf.Clamp(southOmniTextLayer, 0, 31);
+            eastOmniTextLayer = Mathf.Clamp(eastOmniTextLayer, 0, 31);
+            westOmniTextLayer = Mathf.Clamp(westOmniTextLayer, 0, 31);
         }
     }
 }
