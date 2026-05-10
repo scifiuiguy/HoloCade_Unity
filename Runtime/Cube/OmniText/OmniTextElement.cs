@@ -9,31 +9,30 @@ namespace HoloCade.Cube
 {
     /// <summary>
     /// Renders one logical text element to all four station cameras of a HoloCade Cube by
-    /// spawning one TextMeshPro instance per station. Each instance is placed on its station's
-    /// OmniText layer (per <see cref="CubeRuntimeConfig"/>) and rotated to a fixed per-side yaw
-    /// at spawn time so its TMP face points outward toward that side's station camera.
-    /// <see cref="CubeRigController"/> handles the matching per-camera culling so each station
-    /// camera only renders its own instance.
+    /// driving one TextMeshPro instance per station. Each station object lives under this
+    /// transform (typically named <c>OmniText_North</c>, etc.), is placed on its OmniText layer
+    /// (per <see cref="CubeRuntimeConfig"/>), and uses a fixed per-side yaw (cardinals on local Y
+    /// plus 180° by default; see <see cref="flipFacing"/>) so TMP reads toward that side's camera.
+    /// <see cref="CubeRigController"/> applies per-camera culling so each station camera only sees
+    /// its own OmniText layer (<see cref="CubeRuntimeConfig.enableOmniTextStationCulling"/> must stay
+    /// enabled for normal play). If station children remain on Default layer (0), every camera still
+    /// draws all four quads — you will see one correct-facing label plus the other stations’ text
+    /// appearing backward in the same frustum.
     ///
-    /// This is the TextMeshPro-backed implementation of <see cref="IOmniTextElement"/>; a future
-    /// 3D-extruded backend (<c>OmniTextMeshElement</c>) is planned for jumbotron-grade titles
-    /// where mesh depth and lighting matter.
+    /// <para><b>Prefab workflow:</b> look-dev station children in Edit Mode (add/rename/layout),
+    /// merge into the prefab — Play Mode uses that asset. <see cref="Rebuild"/> finds children by name,
+    /// creates only missing sides, applies layers/orientation, and toggles inactive per inspector flags.
+    /// In Edit Mode, TMP content on <em>existing</em> shells is only overwritten from this component when
+    /// <see cref="driveStationContentFromParentInEditMode"/> is enabled (default off) so Prefab Apply is not
+    /// immediately undone; Play Mode always mirrors Content.</para>
     ///
-    /// Typical use (HoloSnake lobby): place an element as a child under <c>[CubeBase]</c>,
-    /// position it where the text should appear in cube-local space (e.g. centered under a
-    /// jumbotron), assign a font asset, and update <see cref="Text"/> at runtime to drive
-    /// countdowns, ready badges, etc.
+    /// This is the TextMeshPro-backed implementation of <see cref="IOmniTextElement"/>.
     /// </summary>
     [AddComponentMenu("HoloCade/Cube/OmniText Element (TextMeshPro)")]
     [DisallowMultipleComponent]
     [ExecuteAlways]
     public class OmniTextElement : MonoBehaviour, IOmniTextElement
     {
-        // Rig + runtime-config are runtime-resolved, not serialized: there's typically exactly
-        // one CubeRigController per scene, so the element auto-discovers it (parent walk first,
-        // scene-wide fallback second) and pulls the runtime config off the rig. Tests and any
-        // unusual multi-rig setups can override via SetStationCameraSource / SetRuntimeConfig
-        // before calling Rebuild().
         CubeRigController _cubeRig;
         CubeRuntimeConfig _runtimeConfig;
 
@@ -49,19 +48,25 @@ namespace HoloCade.Cube
         [SerializeField] TextMeshPro template;
 
         [Header("Layout")]
-        [Tooltip("Uniform local scale applied to each station child. Default 0.1 keeps TMP rasterizing at large internal glyph sizes (paired with fontSize = 12) while the resulting world-space text fits typical HoloCade cube dimensions (~0.6 m wide). Increase for larger text in scene units; decrease for finer text. Affects spawn-time scale; live edits propagate via OnValidate.")]
+        [Tooltip("Uniform local scale applied to each station child when syncing from this component. Live edits propagate via OnValidate / Rebuild.")]
         [Min(0.0001f)] [SerializeField] float stationLocalScale = 0.1f;
 
         [Header("Stations")]
-        [Tooltip("Which station instances to spawn. Disable a side to hide the text from that station entirely.")]
+        [Tooltip("Which station instances are active. Disabled sides deactivate their child object (if present) instead of deleting it.")]
         [SerializeField] bool showOnNorth = true;
         [SerializeField] bool showOnSouth = true;
         [SerializeField] bool showOnEast = true;
         [SerializeField] bool showOnWest = true;
 
         [Header("Orientation")]
-        [Tooltip("If your TextMeshPro mesh appears mirrored (back-facing) at runtime, enable this to add 180° to every station child's yaw. Toggle and re-run if text reads backwards from every side.")]
+        [Tooltip("When true, each station uses raw cardinal yaw only (TMP reads backwards from that station). Default false adds 180° on local Y so text faces the station camera.")]
         [SerializeField] bool flipFacing = false;
+
+        [Header("Edit-mode prefab authoring")]
+        [Tooltip(
+            "When false (default), Edit Mode does not push Content/TMP fields onto existing OmniText_* shells — only layout/orientation/layers. " +
+            "Turn on for live mirroring from this inspector while editing. Play Mode always mirrors. New shells still receive initial Content.")]
+        [SerializeField] bool driveStationContentFromParentInEditMode;
 
         struct StationInstance
         {
@@ -71,8 +76,18 @@ namespace HoloCade.Cube
         }
 
         readonly List<StationInstance> _instances = new List<StationInstance>(4);
-        bool _built;
         ICubeStationCameraSource _cameraSourceOverride;
+
+        /// <summary>Play mode: re-apply OmniText layers for a few frames so ordering after Awake cannot leave station TMPs on Default.</summary>
+        int _playModeLayerWarmupFramesRemaining = 32;
+
+        /// <summary>Once per load: force GameObject active state to match <c>showOn*</c>. After that, only apply when an inspector flag changes so manual hierarchy toggles are not undone every Rebuild.</summary>
+        bool _visibilitySessionInitialized;
+
+        bool _lastAppliedShowNorth;
+        bool _lastAppliedShowSouth;
+        bool _lastAppliedShowEast;
+        bool _lastAppliedShowWest;
 
         public string Text
         {
@@ -100,22 +115,11 @@ namespace HoloCade.Cube
 
         public Transform Transform => transform;
 
-        /// <summary>
-        /// Override the camera source used to gate <see cref="Rebuild"/>. Most titles can leave
-        /// this alone and the element will auto-discover the scene's <see cref="CubeRigController"/>;
-        /// tests with stub rigs can inject an <see cref="ICubeStationCameraSource"/> here so
-        /// Rebuild proceeds even without a real rig. Pass null to revert to auto-discovery.
-        /// </summary>
         public void SetStationCameraSource(ICubeStationCameraSource source)
         {
             _cameraSourceOverride = source;
         }
 
-        /// <summary>
-        /// Override the runtime config used to look up OmniText layer indices. Useful for tests
-        /// or for titles that drive layer maps separately from the rig's own config. Pass null
-        /// to revert to auto-discovery from the resolved cube rig.
-        /// </summary>
         public void SetRuntimeConfig(CubeRuntimeConfig config)
         {
             _runtimeConfig = config;
@@ -128,40 +132,139 @@ namespace HoloCade.Cube
 
         void OnEnable()
         {
-            if (!_built)
-                Rebuild();
+            if (Application.isPlaying)
+                _playModeLayerWarmupFramesRemaining = 32;
+            Rebuild();
         }
 
-        void OnDisable()
+        void Start()
         {
-            DestroyInstances();
-            _built = false;
+            // Runs after all Awakes; ensures cube rig / RuntimeConfig are resolved before the first
+            // full sync when sibling/parent script order left station children on Default during OnEnable.
+            ResolveReferences();
+            Rebuild();
+        }
+
+        void LateUpdate()
+        {
+            if (!Application.isPlaying || _playModeLayerWarmupFramesRemaining <= 0)
+                return;
+            _playModeLayerWarmupFramesRemaining--;
+            ApplyStationLayersFromConfig();
         }
 
         public void Rebuild()
         {
-            DestroyInstances();
-            ResolveReferences();
-            if (ResolveCameraSource() == null || _runtimeConfig == null)
+            if (!CanModifyHierarchyUnder(this))
             {
-                _built = false;
+                ResolveReferences();
+                RefreshInstancesFromChildren();
+                SyncStationVisibilityWithInspectorFlags();
+                ApplyStationLayersFromConfig();
+                ApplyContentAndLayoutToKnownInstances();
                 return;
             }
 
+            ResolveReferences();
             if (template != null)
                 template.gameObject.SetActive(false);
 
-            BuildSide(CubeSide.North, showOnNorth);
-            BuildSide(CubeSide.South, showOnSouth);
-            BuildSide(CubeSide.East, showOnEast);
-            BuildSide(CubeSide.West, showOnWest);
+            _instances.Clear();
 
-            _built = true;
+            SyncSide(CubeSide.North, showOnNorth);
+            SyncSide(CubeSide.South, showOnSouth);
+            SyncSide(CubeSide.East, showOnEast);
+            SyncSide(CubeSide.West, showOnWest);
+
+            SyncStationVisibilityWithInspectorFlags();
+            ApplyStationLayersFromConfig();
 
 #if UNITY_EDITOR
             if (!Application.isPlaying)
                 UnityEditor.SceneView.RepaintAll();
 #endif
+        }
+
+        /// <summary>
+        /// Sets each <c>OmniText_*</c> child’s layer from <see cref="CubeRuntimeConfig"/> so
+        /// <see cref="OmniTextStationLayers.ApplyStationCulling"/> can isolate one instance per camera.
+        /// Safe to call repeatedly (idempotent).
+        /// </summary>
+        void ApplyStationLayersFromConfig()
+        {
+            ResolveReferences();
+            if (_runtimeConfig == null)
+                return;
+
+            void One(CubeSide side)
+            {
+                var tr = FindDirectChildNamed(transform, StationChildName(side));
+                if (tr == null)
+                    return;
+                var layer = _runtimeConfig.GetOmniTextLayerForSide(side);
+                if (tr.gameObject.layer != layer)
+                    tr.gameObject.layer = layer;
+            }
+
+            One(CubeSide.North);
+            One(CubeSide.South);
+            One(CubeSide.East);
+            One(CubeSide.West);
+        }
+
+        /// <summary>
+        /// Drives station GameObject active state from <c>showOn*</c> only when those flags change,
+        /// or once per domain/session on first Rebuild. Avoids <c>SetActive(true)</c> every Rebuild,
+        /// which was undoing manual disables and re-lighting hidden duplicate children.
+        /// </summary>
+        void SyncStationVisibilityWithInspectorFlags()
+        {
+            void ApplyDelta(CubeSide side, bool wantShow, ref bool lastApplied)
+            {
+                if (lastApplied == wantShow)
+                    return;
+                var tr = FindDirectChildNamed(transform, StationChildName(side));
+                if (tr != null)
+                    tr.gameObject.SetActive(wantShow);
+                lastApplied = wantShow;
+            }
+
+            if (!_visibilitySessionInitialized)
+            {
+                void InitOne(CubeSide side, bool wantShow, ref bool lastApplied)
+                {
+                    var tr = FindDirectChildNamed(transform, StationChildName(side));
+                    if (tr != null)
+                        tr.gameObject.SetActive(wantShow);
+                    lastApplied = wantShow;
+                }
+
+                InitOne(CubeSide.North, showOnNorth, ref _lastAppliedShowNorth);
+                InitOne(CubeSide.South, showOnSouth, ref _lastAppliedShowSouth);
+                InitOne(CubeSide.East, showOnEast, ref _lastAppliedShowEast);
+                InitOne(CubeSide.West, showOnWest, ref _lastAppliedShowWest);
+                _visibilitySessionInitialized = true;
+                return;
+            }
+
+            ApplyDelta(CubeSide.North, showOnNorth, ref _lastAppliedShowNorth);
+            ApplyDelta(CubeSide.South, showOnSouth, ref _lastAppliedShowSouth);
+            ApplyDelta(CubeSide.East, showOnEast, ref _lastAppliedShowEast);
+            ApplyDelta(CubeSide.West, showOnWest, ref _lastAppliedShowWest);
+        }
+
+        /// <summary>
+        /// True when we may parent newly created station objects under this transform (not an on-disk prefab asset).
+        /// </summary>
+        static bool CanModifyHierarchyUnder(OmniTextElement self)
+        {
+            if (self == null)
+                return false;
+#if UNITY_EDITOR
+            if (!Application.isPlaying && !self.gameObject.scene.IsValid())
+                return false;
+#endif
+            return true;
         }
 
         ICubeStationCameraSource ResolveCameraSource()
@@ -173,9 +276,6 @@ namespace HoloCade.Cube
 
         void ResolveReferences()
         {
-            // Two-step discovery: prefer the rig that owns this element's hierarchy (typical
-            // case: dropped under [CubeBase]), fall back to a scene-wide search for unusual
-            // placements. Skip if a test injected an override via SetStationCameraSource.
             if (_cubeRig == null && _cameraSourceOverride == null)
             {
                 _cubeRig = GetComponentInParent<CubeRigController>();
@@ -190,10 +290,6 @@ namespace HoloCade.Cube
                 _runtimeConfig = _cubeRig.RuntimeConfig;
         }
 
-        /// <summary>
-        /// Fixed per-side yaw (degrees) so each station's TMP face points outward toward its
-        /// camera. Cube convention: N faces +Z, E faces +X, S faces -Z, W faces -X.
-        /// </summary>
         static float YawDegreesForSide(CubeSide side)
         {
             switch (side)
@@ -206,31 +302,104 @@ namespace HoloCade.Cube
             }
         }
 
-        void BuildSide(CubeSide side, bool enabled)
+        static float StationYawDegrees(CubeSide side, bool flipFacing) =>
+            YawDegreesForSide(side) + (flipFacing ? 0f : 180f);
+
+        static string StationChildName(CubeSide side) =>
+            $"OmniText_{CubeSideUtility.SideName(side)}";
+
+        static Transform FindDirectChildNamed(Transform root, string childName)
         {
+            for (var i = 0; i < root.childCount; i++)
+            {
+                var c = root.GetChild(i);
+                if (c.name == childName)
+                    return c;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Legacy builds / TMP can leave <see cref="HideFlags.HideInHierarchy"/> on shells or child
+        /// objects — they still raycast in Scene view but do not appear under Hierarchy. Cleared on sync.
+        /// </summary>
+        static void ClearHideFlagsRecursive(GameObject go)
+        {
+            if (go == null)
+                return;
+            go.hideFlags = HideFlags.None;
+            var tr = go.transform;
+            for (var i = 0; i < tr.childCount; i++)
+                ClearHideFlagsRecursive(tr.GetChild(i).gameObject);
+        }
+
+        /// <summary>
+        /// Ensures the station child exists (find authored, or create if allowed), toggles active,
+        /// assigns layer and synced transform/TMP fields.
+        /// </summary>
+        void SyncSide(CubeSide side, bool enabled)
+        {
+            var childName = StationChildName(side);
+            var tr = FindDirectChildNamed(transform, childName);
+
             if (!enabled)
                 return;
 
-            var go = new GameObject($"OmniText_{CubeSideUtility.SideName(side)}");
-            // Children are runtime-generated under the element's transform; never serialize
-            // them into the scene or prefab.
-            go.hideFlags = HideFlags.DontSave;
-            go.transform.SetParent(transform, worldPositionStays: false);
-            go.transform.localPosition = Vector3.zero;
-            go.transform.localRotation = Quaternion.Euler(0f, YawDegreesForSide(side) + (flipFacing ? 180f : 0f), 0f);
-            go.transform.localScale = Vector3.one * stationLocalScale;
-            go.layer = _runtimeConfig.GetOmniTextLayerForSide(side);
+            GameObject go;
+            TextMeshPro tmp;
+            var createdNew = false;
 
-            var tmp = go.AddComponent<TextMeshPro>();
-            ApplyTypographyTo(tmp);
-            tmp.text = text;
-            tmp.color = color;
-            tmp.alignment = alignment;
-            tmp.fontSize = fontSize;
-            if (font != null)
-                tmp.font = font;
+            if (tr != null)
+            {
+                go = tr.gameObject;
+                tmp = go.GetComponent<TextMeshPro>();
+                if (tmp == null)
+                    tmp = go.AddComponent<TextMeshPro>();
+            }
+            else
+            {
+                if (ResolveCameraSource() == null || _runtimeConfig == null)
+                    return;
+
+                go = new GameObject(childName);
+                go.transform.SetParent(transform, false);
+                createdNew = true;
+                tmp = go.AddComponent<TextMeshPro>();
+            }
+
+            if (_runtimeConfig != null)
+                go.layer = _runtimeConfig.GetOmniTextLayerForSide(side);
+
+            go.transform.localRotation = Quaternion.Euler(0f, StationYawDegrees(side, flipFacing), 0f);
+            go.transform.localScale = Vector3.one * stationLocalScale;
+            if (createdNew)
+                go.transform.localPosition = Vector3.zero;
+
+            if (ShouldDriveStationTmpContent(createdNew))
+            {
+                ApplyTypographyTo(tmp);
+                tmp.text = text;
+                tmp.color = color;
+                tmp.alignment = alignment;
+                tmp.fontSize = fontSize;
+                if (font != null)
+                    tmp.font = font;
+            }
+
+            ClearHideFlagsRecursive(go);
 
             _instances.Add(new StationInstance { Side = side, Go = go, Tmp = tmp });
+        }
+
+        bool ShouldDriveStationTmpContent(bool createdNewStationShell)
+        {
+            if (Application.isPlaying)
+                return true;
+#if UNITY_EDITOR
+            return driveStationContentFromParentInEditMode || createdNewStationShell;
+#else
+            return true;
+#endif
         }
 
         void ApplyTypographyTo(TextMeshPro tmp)
@@ -252,9 +421,60 @@ namespace HoloCade.Cube
                 tmp.font = template.font;
         }
 
+        void RefreshInstancesFromChildren()
+        {
+            _instances.Clear();
+            if (showOnNorth)
+                TryAddInstanceFromChild(CubeSide.North, StationChildName(CubeSide.North));
+            if (showOnSouth)
+                TryAddInstanceFromChild(CubeSide.South, StationChildName(CubeSide.South));
+            if (showOnEast)
+                TryAddInstanceFromChild(CubeSide.East, StationChildName(CubeSide.East));
+            if (showOnWest)
+                TryAddInstanceFromChild(CubeSide.West, StationChildName(CubeSide.West));
+        }
+
+        void TryAddInstanceFromChild(CubeSide side, string childName)
+        {
+            var tr = FindDirectChildNamed(transform, childName);
+            if (tr == null)
+                return;
+            var tmp = tr.GetComponent<TextMeshPro>();
+            if (tmp == null)
+                return;
+            _instances.Add(new StationInstance { Side = side, Go = tr.gameObject, Tmp = tmp });
+        }
+
+        void ApplyContentAndLayoutToKnownInstances()
+        {
+            ApplyStationLayersFromConfig();
+
+            var scaleVec = Vector3.one * stationLocalScale;
+            for (var i = 0; i < _instances.Count; i++)
+            {
+                var inst = _instances[i];
+                if (inst.Go == null || inst.Tmp == null)
+                    continue;
+                inst.Go.transform.localScale = scaleVec;
+                inst.Go.transform.localRotation = Quaternion.Euler(
+                    0f,
+                    StationYawDegrees(inst.Side, flipFacing),
+                    0f);
+                if (ShouldDriveStationTmpContent(createdNewStationShell: false))
+                {
+                    inst.Tmp.text = text;
+                    inst.Tmp.color = color;
+                    inst.Tmp.fontSize = fontSize;
+                    inst.Tmp.alignment = alignment;
+                    if (font != null)
+                        inst.Tmp.font = font;
+                }
+            }
+        }
+
         void ApplyText()
         {
-            for (int i = 0; i < _instances.Count; i++)
+            for (var i = 0; i < _instances.Count; i++)
             {
                 var inst = _instances[i];
                 if (inst.Tmp != null)
@@ -264,7 +484,7 @@ namespace HoloCade.Cube
 
         void ApplyColor()
         {
-            for (int i = 0; i < _instances.Count; i++)
+            for (var i = 0; i < _instances.Count; i++)
             {
                 var inst = _instances[i];
                 if (inst.Tmp != null)
@@ -272,55 +492,19 @@ namespace HoloCade.Cube
             }
         }
 
-        void DestroyInstances()
-        {
-            for (int i = 0; i < _instances.Count; i++)
-            {
-                var inst = _instances[i];
-                if (inst.Go == null)
-                    continue;
-                if (Application.isPlaying)
-                    Destroy(inst.Go);
-                else
-                    DestroyImmediate(inst.Go);
-            }
-            _instances.Clear();
-        }
-
 #if UNITY_EDITOR
         bool _editorRebuildQueued;
 
         void OnValidate()
         {
-            // Cheap property updates: propagate font/text/color/alignment/scale to live
-            // instances. Safe to run during serialization because we only mutate existing
-            // components — we don't create or destroy GameObjects here.
-            ApplyText();
-            ApplyColor();
-            var scaleVec = Vector3.one * stationLocalScale;
-            for (int i = 0; i < _instances.Count; i++)
-            {
-                var inst = _instances[i];
-                if (inst.Go != null)
-                {
-                    inst.Go.transform.localScale = scaleVec;
-                    inst.Go.transform.localRotation = Quaternion.Euler(
-                        0f,
-                        YawDegreesForSide(inst.Side) + (flipFacing ? 180f : 0f),
-                        0f);
-                }
-                var tmp = inst.Tmp;
-                if (tmp == null) continue;
-                tmp.fontSize = fontSize;
-                tmp.alignment = alignment;
-                if (font != null) tmp.font = font;
-            }
-
-            // Structural changes (showOnX toggles, layer rebinds) require Rebuild, which
-            // destroys/creates GameObjects — illegal during OnValidate's serialization callback,
-            // so defer until the next editor tick. Skip in play mode.
-            if (!Application.isPlaying)
+            // Do not push TMP/content synchronously here — it runs before prefab Apply finishes merging
+            // children and fights overrides. Defer to Rebuild(), which uses ShouldDriveStationTmpContent.
+#if UNITY_EDITOR
+            if (Application.isPlaying)
+                Rebuild();
+            else
                 QueueEditorSafeRebuild();
+#endif
         }
 
         void QueueEditorSafeRebuild()
@@ -331,7 +515,7 @@ namespace HoloCade.Cube
             UnityEditor.EditorApplication.delayCall += () =>
             {
                 _editorRebuildQueued = false;
-                if (this == null)
+                if (this == null || Application.isPlaying)
                     return;
                 Rebuild();
             };
