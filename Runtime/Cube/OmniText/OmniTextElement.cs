@@ -113,6 +113,20 @@ namespace HoloCade.Cube
             }
         }
 
+        /// <summary>TMP point size on every station instance (mirrors serialized <c>fontSize</c>).</summary>
+        public float FontSize
+        {
+            get => fontSize;
+            set
+            {
+                var v = Mathf.Max(0.001f, value);
+                if (Mathf.Approximately(fontSize, v))
+                    return;
+                fontSize = v;
+                ApplyFontSizeToInstances();
+            }
+        }
+
         public Transform Transform => transform;
 
         public void SetStationCameraSource(ICubeStationCameraSource source)
@@ -178,6 +192,10 @@ namespace HoloCade.Cube
 
             SyncStationVisibilityWithInspectorFlags();
             ApplyStationLayersFromConfig();
+
+            // Push parent Content to shells after SyncSide (covers Text/Color set while _instances was empty,
+            // and keeps authored shells in sync when Rebuild runs after external IOmniTextElement writes).
+            ApplyContentAndLayoutToKnownInstances();
 
 #if UNITY_EDITOR
             if (!Application.isPlaying)
@@ -489,6 +507,16 @@ namespace HoloCade.Cube
                 var inst = _instances[i];
                 if (inst.Tmp != null)
                     inst.Tmp.color = color;
+            }
+        }
+
+        void ApplyFontSizeToInstances()
+        {
+            for (var i = 0; i < _instances.Count; i++)
+            {
+                var inst = _instances[i];
+                if (inst.Tmp != null)
+                    inst.Tmp.fontSize = fontSize;
             }
         }
 

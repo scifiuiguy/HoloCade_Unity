@@ -2000,6 +2000,7 @@ Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
 - [ ] Operator-menu integration sketch (deferred to the operator-menu milestone, but link the contract from here so the Free Play surface is part of the same task graph): the operator menu reads / writes `ArcadeCabinetIOConfig.freePlayEnabled` and persists across power cycles. Until that menu lands, Free Play is editable in the inspector + via the diagnostics override.
 - [ ] Cabinet diagnostics page: `CabinetDiagnosticsHost` adds a "Credits & Free Play" tab showing the live mode (paid / free-play), pool count if paid, last credit-event timestamp, and a toggle for Free Play override (gated behind a service-mode check).
 - [ ] Test scene + EditMode tests: build a fake `ArcadeCabinetBridge` + paid-mode policy and assert Start presses are rejected when pool is empty; flip Free Play on and assert the same Start presses are accepted with `Claimed` and `CabinetCreditDisplayMode.FreePlay`.
+- [ ] **Replace HoloSnake interim credit-policy stubs:** HoloSnake v0.1.1 ships `HoloSnake.Cabinet.ICabinetCreditPolicy`, `CreditClaimOutcome`, and `StubCabinetCreditPolicy` under `Assets/HoloSnake/Scripts/Game/Cabinet/` until this task block lands the official types in `HoloCade.Cabinet`. Delete or thin-wrap those HoloSnake types once `TryClaimCredit` / `CabinetCreditDisplayMode` exist here so titles bind one SDK symbol.
 
 **Title-side contract (for HoloSnake and any future cabinet title):**
 
