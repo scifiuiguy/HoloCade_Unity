@@ -35,5 +35,33 @@ namespace HoloCade.Cabinet
 
             return c;
         }
+
+        /// <summary>
+        /// Reference four-player cabinet: four stations, shared credit inputs, one joystick and eight
+        /// logical button indices per station (typical games bind a subset, e.g. two face buttons).
+        /// Channel 40 in, 41 out — common pairing with host serial→UDP forwarders.
+        /// </summary>
+        public static ArcadeCabinetIOConfig CreateReferenceFourPlayerCabinet()
+        {
+            var c = ScriptableObject.CreateInstance<ArcadeCabinetIOConfig>();
+            c.playerSlotCount = 4;
+            c.sharedCreditInputs = true;
+            c.inputPacketChannel = 40;
+            c.outputPacketChannel = 41;
+
+            c.playerSlots = new PlayerSlotIoBindings[4];
+            for (var i = 0; i < 4; i++)
+            {
+                c.playerSlots[i] = new PlayerSlotIoBindings
+                {
+                    hasStartButton = true,
+                    joystickCount = 1,
+                    buttonCount = 8,
+                    buttonsSupportLedMapping = false
+                };
+            }
+
+            return c;
+        }
     }
 }

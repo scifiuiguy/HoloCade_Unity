@@ -1,6 +1,7 @@
 // Copyright (c) 2025 AJ Campbell. Licensed under the MIT License.
 
 using HoloCade.Core.Networking;
+using HoloCade;
 using UnityEngine;
 
 namespace HoloCade.Cube
@@ -9,6 +10,7 @@ namespace HoloCade.Cube
     /// Reads <see cref="HoloCadeUDPTransport"/> float channels (atlas u,v per side) in <b>Local listener</b> role
     /// and returns a stub world-space eye position for parallax experiments. Replace with calibrated mapping later.
     /// </summary>
+    [InspectorPurpose("Reads UDP float channels into stub per-side eye positions for parallax experiments via the rig's face-tracking provider slot.")]
     [DisallowMultipleComponent]
     public class HyperCubePoseTrackingProvider : CubeFaceTrackingProviderBase
     {

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using HoloCade;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -20,6 +21,7 @@ namespace HoloCade.Core.Networking
     /// - Simple CRC checksum
     /// - Channel-based API for easy integration
     /// </summary>
+    [InspectorPurpose("Sends and receives HoloCade UDP binary packets (CRC'd channels) for haptics, pose ingest, and cabinet IO using the configured role and endpoints.")]
     public class HoloCadeUDPTransport : MonoBehaviour
     {
         public enum UdpRole

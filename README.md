@@ -1978,6 +1978,8 @@ Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
 - Keep shared packet transport and cabinet topology configuration in HoloCade SDK
 - Implement title-specific control semantics (e.g. Up/Down meaning, game state transitions) in title code
 
+**Bench / emulation (no USB hardware):** For Play Mode without a physical serial forwarder, titles or their hardware partners can run a small **host utility** that sends the same UDP `Bytes` packets your production bridge expects (same host/port as `HoloCadeUDPTransport`, same `inputPacketChannel` as `ArcadeCabinetIOConfig`). Payload layout is title- and firmware-specific; keep the utility next to your ECU tools or CI fixtures rather than coupling the SDK to any one vendor repo.
+
 #### Free Play Mode (planned)
 
 > **Why this lives in the SDK, not in titles.** Operator-toggleable Free Play is a venue-management concern that **every** cabinet title eventually needs (location operators run free-play days, dev/QA work bypasses card readers, museum / private-event installs may run permanently free). Re-implementing it per title would guarantee inconsistent behavior across the HoloCade catalog. The Cabinet module owns the topology — credits live here in `ArcadeCabinetIOConfig`, the bridge already fires `OnSharedCoinPulse` / `OnSharedCardPulse` / `OnPlayerCoinPulse` / `OnPlayerCardPulse` — so it is also the right place to own the "**no credits required**" override.
@@ -2000,9 +2002,9 @@ Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
 - [ ] Operator-menu integration sketch (deferred to the operator-menu milestone, but link the contract from here so the Free Play surface is part of the same task graph): the operator menu reads / writes `ArcadeCabinetIOConfig.freePlayEnabled` and persists across power cycles. Until that menu lands, Free Play is editable in the inspector + via the diagnostics override.
 - [ ] Cabinet diagnostics page: `CabinetDiagnosticsHost` adds a "Credits & Free Play" tab showing the live mode (paid / free-play), pool count if paid, last credit-event timestamp, and a toggle for Free Play override (gated behind a service-mode check).
 - [ ] Test scene + EditMode tests: build a fake `ArcadeCabinetBridge` + paid-mode policy and assert Start presses are rejected when pool is empty; flip Free Play on and assert the same Start presses are accepted with `Claimed` and `CabinetCreditDisplayMode.FreePlay`.
-- [ ] **Replace HoloSnake interim credit-policy stubs:** HoloSnake v0.1.1 ships `HoloSnake.Cabinet.ICabinetCreditPolicy`, `CreditClaimOutcome`, and `StubCabinetCreditPolicy` under `Assets/HoloSnake/Scripts/Game/Cabinet/` until this task block lands the official types in `HoloCade.Cabinet`. Delete or thin-wrap those HoloSnake types once `TryClaimCredit` / `CabinetCreditDisplayMode` exist here so titles bind one SDK symbol.
+- [ ] **Migrate interim title-local credit-policy stubs:** Early integrators sometimes ship duplicate `ICabinetCreditPolicy` / outcome types under their own assembly until this task block lands the official symbols in `HoloCade.Cabinet`. Once `TryClaimCredit` / `CabinetCreditDisplayMode` exist here, titles should delete or thin-wrap local copies so everything binds one SDK type.
 
-**Title-side contract (for HoloSnake and any future cabinet title):**
+**Title-side contract (for cabinet titles):**
 
 - Titles **must** consume credit decisions through `ICabinetCreditPolicy.TryClaimCredit`, not by reading their own `availableCoinCredits` pool directly inside the lobby state machine. The pool itself remains title-owned (it's a `LobbyController` concern), but **whether a Start press counts** is an SDK decision.
 - Titles **must** render the credit indicator using `CabinetCreditDisplayMode` so all HoloCade cabinets show consistent Free Play UX.
@@ -2088,7 +2090,7 @@ Cube games inherit a hard rule from the Cube's omnidirectional viewing geometry:
 
 ```
 +----------------------------+         +-----------------------------+
-|  Title (HoloSnake)         |         |  HoloCade.Cube              |
+|  Integrating title        |         |  HoloCade.Cube              |
 |  e.g. lobby UI             |         |  CubeRigController          |
 |                            |  uses   |  └─ TryGetSideCamera(side)  |
 |  IOmniTextElement          | <-----> |     (ICubeStationCameraSource)
@@ -2136,7 +2138,7 @@ These avoid the default portal layers (`24..27`) and Unity's reserved layers (`0
 - [x] Add EditMode unit coverage (`Tests/Editor/HoloCade.Tests.Editor.asmdef`) with `OmniTextStationLayersTests` (8 cases — pure layer math) and `OmniTextElementTests` (8 cases — per-station spawn, layer assignment, content propagation, idempotent rebuild, missing-config / missing-source guards).
 - [x] Ship drop-in prefab `Runtime/Cube/CubeAssets/OmniText.prefab` (TMP-backed `OmniTextElement` with authored font/material defaults). Instantiate under `[CubeBase]` or drag from the package Cube assets folder; add or generate `OmniText_<Side>` children for look-dev and save — Play Mode reuses those instances.
 
-**Tasks (3D extruded backend — planned, not blocking HoloSnake v0.1.1):**
+**Tasks (3D extruded backend — planned, not blocking early cabinet titles on the TMP slice):**
 
 - [ ] `OmniText_Mesh3D.prefab` and matching backend implementing `IOmniTextElement` (see backend recommendation below).
 - [ ] PlayMode test that drops an `OmniText` prefab instance into the cube center and asserts: from each station camera, exactly one instance of the text element is rendered (other layers culled), and the visible instance's forward axis matches the fixed per-side yaw within tolerance. The EditMode tests above cover the layer-and-spawn invariants synthetically; the PlayMode test pairs it with a real `CubeRigController` rebuild + camera render frame.
@@ -2155,7 +2157,7 @@ The `HoloCade.Tests.Editor` asmdef lives inside the package, so the consumer's `
 }
 ```
 
-(`HoloSnake_Unity/Packages/manifest.json` already does this.)
+If you consume a forked package, use its `package.json` `name` in `testables` instead of `com.ajcampbell.holocade`.
 
 **Backend recommendation (3D extruded geometry text):**
 
@@ -2168,9 +2170,9 @@ There is no clear universally-adopted free Unity plugin for 3D extruded geometry
 
 Default plan: ship `OmniText_Mesh3D` against **Typogenic** for the open-source baseline so the SDK has zero paid dependencies, but keep the `IOmniTextElement` backend selector open so titles that need higher fidelity can drop in **Dynamic 3D Text** without changing any call site. Re-evaluate if Typogenic breaks against a future Unity LTS.
 
-**Title dependencies (active):**
+**Typical first integrations:**
 
-- **HoloSnake v0.1.1** (`Lobby, Cabinet Coin/Credit Flow & Per-Player Button Bindings`) — depends on this primitive for the lobby jumbotron, center "credits" tally, per-quadrant "Ready" badges, countdown digits, and any other cube-visible text. The TMP-backed drop-in is **`Runtime/Cube/CubeAssets/OmniText.prefab`** (`OmniTextElement`). The 3D extruded variant is **not** required for HoloSnake's first cabinet flow and can ship independently.
+- Lobby jumbotron, center credit tally, per-quadrant ready badges, countdown digits, and other cube-visible HUD copy are the primary consumers of this primitive. The TMP-backed drop-in is **`Runtime/Cube/CubeAssets/OmniText.prefab`** (`OmniTextElement`). The 3D extruded backend is optional and can ship later without blocking cabinet credit / input flows.
 
 </blockquote>
 

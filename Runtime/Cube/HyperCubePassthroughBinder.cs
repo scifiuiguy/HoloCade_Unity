@@ -1,5 +1,6 @@
 // Copyright (c) 2025 AJ Campbell. Licensed under the MIT License.
 
+using HoloCade;
 using UnityEngine;
 
 namespace HoloCade.Cube
@@ -9,6 +10,7 @@ namespace HoloCade.Cube
     /// <see cref="CubePassthroughSources"/> and assigns it to <see cref="CubeRigController"/>.
     /// Default quadrant order: 0→North, 1→South, 2→East, 3→West (remappable later).
     /// </summary>
+    [InspectorPurpose("Builds a CubePassthroughSources from HyperCube quadrant TCP textures and assigns it to the CubeRigController for live portal feeds.")]
     [DisallowMultipleComponent]
     public class HyperCubePassthroughBinder : MonoBehaviour
     {

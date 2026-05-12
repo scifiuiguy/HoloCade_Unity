@@ -8,6 +8,7 @@ using UnityEngine;
 namespace HoloCade.Editor
 {
     [CustomEditor(typeof(CubeRigController))]
+    [CanEditMultipleObjects]
     public class CubeRigControllerEditor : UnityEditor.Editor
     {
         SerializedProperty _runtimeConfigProp;
@@ -47,6 +48,8 @@ namespace HoloCade.Editor
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
+
+            InspectorPurposeDrawer.DrawIfPresent(target);
 
             EditorGUILayout.PropertyField(_runtimeConfigProp);
             EditorGUILayout.Space();

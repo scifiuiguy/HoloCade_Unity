@@ -266,4 +266,4 @@ Expected behavior of the **Unity tracking shim** (networked mode):
 
 - Cabinet module remains responsible for control/payment IO and UDP transport.
 - Cube module is responsible for rendering and visual-spatial behavior of the four-sided display volume.
-- Title-level gameplay (e.g. HoloSnake) should depend on Cube/Cabinet APIs and avoid duplicating shared Cube rendering logic.
+- Title-level gameplay should depend on Cube/Cabinet APIs and avoid duplicating shared Cube rendering logic.

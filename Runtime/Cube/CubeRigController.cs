@@ -1,6 +1,7 @@
 // Copyright (c) 2025 AJ Campbell. Licensed under the MIT License.
 
 using System.Collections.Generic;
+using HoloCade;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -14,6 +15,7 @@ namespace HoloCade.Cube
     /// - 4 boundary portals carrying passthrough textures
     /// - virtual floor, ceiling, and frame primitives
     /// </summary>
+    [InspectorPurpose("Builds and owns the four-sided cube rig, inward station cameras, portals, and floor/ceiling from the selected monitor and passthrough sources.")]
     [ExecuteAlways]
     [DisallowMultipleComponent]
     public class CubeRigController : MonoBehaviour, ICubeDisplayAspect, ICubeStationCameraSource

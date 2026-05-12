@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using HoloCade;
 using HoloCade.Core.Networking;
 using UnityEngine;
 
@@ -12,6 +13,7 @@ namespace HoloCade.Cabinet
     /// Incoming cabinet IO is packet-based: [messageType][playerSlotIndex][payload...].
     /// shared credit mode uses playerSlotIndex = -1 for coin/card packets.
     /// </summary>
+    [InspectorPurpose("Translates cabinet UDP packets (credits, start, inputs) into semantic events for games on the same object as HoloCadeUDPTransport.")]
     [DisallowMultipleComponent]
     [RequireComponent(typeof(HoloCadeUDPTransport))]
     public sealed class ArcadeCabinetBridge : MonoBehaviour

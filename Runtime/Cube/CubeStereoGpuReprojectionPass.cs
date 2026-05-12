@@ -1,6 +1,7 @@
 // Copyright (c) 2025 AJ Campbell. Licensed under the MIT License.
 
 using System.Collections.Generic;
+using HoloCade;
 using UnityEngine;
 
 namespace HoloCade.Cube
@@ -9,6 +10,7 @@ namespace HoloCade.Cube
     /// GPU reprojection path using compute shaders.
     /// Replaces CPU GetPixels reprojection for runtime performance.
     /// </summary>
+    [InspectorPurpose("Runs GPU compute reprojection from stereo/portal frames into the rig's quadrant color targets for passthrough display.")]
     [ExecuteAlways]
     [DisallowMultipleComponent]
     public class CubeStereoGpuReprojectionPass : MonoBehaviour

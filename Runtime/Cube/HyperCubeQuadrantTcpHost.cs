@@ -6,6 +6,7 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using HoloCade;
 using UnityEngine;
 
 namespace HoloCade.Cube
@@ -14,6 +15,7 @@ namespace HoloCade.Cube
     /// Hosts four TCP listeners (parameterizable ports). HyperCube connects as client and sends
     /// <c>uint32 big-endian length</c> + JPEG bytes per frame. Decoded frames are applied on the main thread.
     /// </summary>
+    [InspectorPurpose("Hosts TCP listeners for four JPEG quadrant streams from HyperCube and queues decoded textures for the passthrough binder.")]
     [DisallowMultipleComponent]
     public class HyperCubeQuadrantTcpHost : MonoBehaviour
     {

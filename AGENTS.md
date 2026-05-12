@@ -12,6 +12,13 @@
 
 Use this tree for context: Root → Runtime Modules → Templates/Hardware. Prioritize OpenXR for VR tasks; use NetCode for multiplayer sims. For cross-engine parity, reference sibling Unreal repo (github.com/scifiuiguy/HoloCade_Unreal) via shared API mappings in /src/common (if added).
 
+## HoloCade vs private example titles (one-way documentation)
+
+- **HoloCade is public.** READMEs, XML doc, sample copy, and agent-facing notes must assume integrators have **only** this repo and its published package — not any sibling private game or hardware tree.
+- **Private repos (e.g. HoloSnake and its ECU/firmware)** are **not** part of that audience. They may consume HoloCade as an internal reference title; most HoloCade users will **never** have access to them.
+- **Do not** name, link, or point readers at private titles from HoloCade: no URLs, no repo paths, no “see title X’s README,” no APIs or presets branded after a private product. Prefer neutral wording (“reference cabinet,” “example integrator,” “title-owned host utility”).
+- **The reverse is encouraged:** private titles **should** reference and link to HoloCade (docs, package, APIs) because that is the shared, shippable contract.
+
 ## Version control (agents)
 
 - **Do not commit or push without an explicit request** — Do not run `git commit`, `git push`, or other commands that create local commits or update remotes unless the user **explicitly** asks you to commit and/or push (wording like “commit this” / “push to origin”). Edits to the working tree are fine; leaving commits for the user is the default.
