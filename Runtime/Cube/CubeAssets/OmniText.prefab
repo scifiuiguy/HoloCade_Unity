@@ -240,6 +240,7 @@ MonoBehaviour:
   alignment: 514
   template: {fileID: 0}
   stationLocalScale: 0.1
+  localDepth: 0
   showOnNorth: 1
   showOnSouth: 1
   showOnEast: 1

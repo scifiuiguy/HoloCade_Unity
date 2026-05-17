@@ -1954,7 +1954,9 @@ Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
 - `ArcadeCabinetIOConfig` - ScriptableObject defining cabinet topology, packet channels, shared/per-player credit mode, and slot bindings
 - `PlayerSlotIoBindings` - per-player station capability profile (start button, joystick count, button count, LED mapping)
 - `CabinetConfigPresets` - convenience runtime templates for known cabinet patterns
-- `CabinetDiagnosticsHost` / `CabinetDiagnosticsRegistry` / `ICabinetDiagnosticPage` - diagnostics extension points for QC and service tooling
+- `CabinetDiagnosticsHost` / `CabinetDiagnosticsRegistry` / `ICabinetDiagnosticPage` — **in-repo scaffold** (UI Toolkit shell, F10 toggle, placeholder pages). **v0.1.5** schedules completion of an **arcade–familiar operator test / service menu** on top of this host (see Roadmap → **v0.1.5 — Cabinet: service / test menu**).
+
+**Service / diagnostics menu (Cabinet scope):** The **`Cabinet`** module targets **any** future cabinet design that uses HoloCade to streamline custom IO, credits, and operator workflows — **not** only cube rigs. The shipped **test / service menu** should therefore stay **very close in shape and behavior** to **operator test menus common on commercial arcade cabinets** (navigation idioms, top-level sections, credits/diagnostics parity) so third-party hardware teams get a familiar baseline. **Cube** (`HoloCade.Cube`) provides a **slightly specialized** menu template (see Cube module): **four** face displays and **audio assumed integrated with those monitors** (four matched outputs). A title (their equivalent of HoloSnake) may wire **either** the **Cabinet** boilerplate host / pages **or** the **Cube**-specialized template — or mix **Cabinet** shell with **Cube**-registered pages via **`CabinetDiagnosticsRegistry`**, depending on product.
 
 **Packet Model (ECU -> Game):**
 - Message envelope: `[messageType][playerSlotIndex][payload...]`
@@ -1980,7 +1982,7 @@ Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
 
 **Bench / emulation (no USB hardware):** For Play Mode without a physical serial forwarder, titles or their hardware partners can run a small **host utility** that sends the same UDP `Bytes` packets your production bridge expects (same host/port as `HoloCadeUDPTransport`, same `inputPacketChannel` as `ArcadeCabinetIOConfig`). Payload layout is title- and firmware-specific; keep the utility next to your ECU tools or CI fixtures rather than coupling the SDK to any one vendor repo.
 
-#### Free Play Mode (planned)
+#### Free Play Mode (v0.1.4 — see Roadmap)
 
 > **Why this lives in the SDK, not in titles.** Operator-toggleable Free Play is a venue-management concern that **every** cabinet title eventually needs (location operators run free-play days, dev/QA work bypasses card readers, museum / private-event installs may run permanently free). Re-implementing it per title would guarantee inconsistent behavior across the HoloCade catalog. The Cabinet module owns the topology — credits live here in `ArcadeCabinetIOConfig`, the bridge already fires `OnSharedCoinPulse` / `OnSharedCardPulse` / `OnPlayerCoinPulse` / `OnPlayerCardPulse` — so it is also the right place to own the "**no credits required**" override.
 
@@ -1989,20 +1991,7 @@ Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
 - Operator-friendly UX: titles render a clear `FREE PLAY` indicator (instead of a numeric credit count) so players understand the cabinet is open, and "Start" presses are honored without a swipe / coin pulse.
 - Cleanly defined contract with credit topology (shared vs per-player) so titles don't have to special-case Free Play deep in their state machines.
 
-**Tasks:**
-
-- [ ] Extend `ArcadeCabinetIOConfig` with a `freePlayEnabled` boolean field (default `false`) plus a runtime accessor on `ArcadeCabinetBridge` (`bool IsFreePlayEnabled { get; }`) so titles read one symbol regardless of where the toggle was flipped.
-- [ ] Add a runtime override path: `ArcadeCabinetBridge.SetFreePlayOverride(bool enabled)` for editor / diagnostics / operator-menu toggling without re-importing the ScriptableObject. Surface via `CabinetDiagnosticsHost` so service mode can flip it on-cabinet.
-- [ ] Define a Cabinet-module **credit policy interface** that Free Play implements alongside the existing card/coin path:
-  - `ICabinetCreditPolicy.TryClaimCredit(int slot, out CreditClaimResult result)` — title-side lobbies call this on each Start press; the policy decides whether the press is honored.
-  - In **paid** mode the policy reads `availableCoinCredits` from the title's lobby pool and returns `Claimed` / `Rejected` accordingly.
-  - In **free-play** mode the policy returns `Claimed` unconditionally (no pool read, no decrement).
-- [ ] Define a `CabinetCreditDisplayMode` enum returned by the policy so titles render the correct indicator without re-checking the toggle: `Numeric` (paid mode, render the integer pool) vs `FreePlay` (render localized "FREE PLAY" copy).
-- [ ] Reference `KeyboardCabinetCreditSource` adapter (editor-only) gains a free-play passthrough so dev workflows don't need swipe-key spam.
-- [ ] Operator-menu integration sketch (deferred to the operator-menu milestone, but link the contract from here so the Free Play surface is part of the same task graph): the operator menu reads / writes `ArcadeCabinetIOConfig.freePlayEnabled` and persists across power cycles. Until that menu lands, Free Play is editable in the inspector + via the diagnostics override.
-- [ ] Cabinet diagnostics page: `CabinetDiagnosticsHost` adds a "Credits & Free Play" tab showing the live mode (paid / free-play), pool count if paid, last credit-event timestamp, and a toggle for Free Play override (gated behind a service-mode check).
-- [ ] Test scene + EditMode tests: build a fake `ArcadeCabinetBridge` + paid-mode policy and assert Start presses are rejected when pool is empty; flip Free Play on and assert the same Start presses are accepted with `Claimed` and `CabinetCreditDisplayMode.FreePlay`.
-- [ ] **Migrate interim title-local credit-policy stubs:** Early integrators sometimes ship duplicate `ICabinetCreditPolicy` / outcome types under their own assembly until this task block lands the official symbols in `HoloCade.Cabinet`. Once `TryClaimCredit` / `CabinetCreditDisplayMode` exist here, titles should delete or thin-wrap local copies so everything binds one SDK type.
+**Tasks (checklist):** tracked on the repo roadmap under **v0.1.4 — Cabinet: Free Play & credit policy** (**A1–A4**, **A7–A8**) and **v0.1.5 — Cabinet: service / test menu** (**CabinetDiagnosticsHost** shell, then credits / Free Play page, dev keyboard passthrough, HoloSnake operator persistence). Runtime evaluation: **`CabinetCreditEvaluation`** + **`ICabinetPaidCreditPool`**; **no** `SetFreePlayOverride` — **`ArcadeCabinetIOConfig.freePlayEnabled`** is the only source of truth.
 
 **Title-side contract (for cabinet titles):**
 
@@ -2010,10 +1999,11 @@ Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
 - Titles **must** render the credit indicator using `CabinetCreditDisplayMode` so all HoloCade cabinets show consistent Free Play UX.
 - Titles **may** still own per-game rules (e.g. "one credit per station per session", "credits persist between lobbies", win-condition unlocks), as long as those rules apply **after** the SDK-level credit decision.
 
-**Out of scope for this task block (deferred):**
-- Operator-menu UI itself (lives in its own milestone alongside other cabinet-service flows).
-- Persistence of operator settings to disk (cabinet-service milestone).
+**Out of scope for v0.1.4 (see Roadmap; v0.1.5 where noted):**
+- Operator / service **test menu** UI (**v0.1.5** — **`CabinetDiagnosticsHost`** completion + **Credits & Free Play** page).
+- Persistence of operator settings to disk (cabinet-service milestone; **v0.1.5** alignment).
 - Time-window scheduling ("free play 5-7pm only") — out of scope; if needed, build on top of `freePlayEnabled` later.
+- Editor keyboard passthrough for Free Play without repeated swipe simulation (**v0.1.5**).
 
 </blockquote>
 
@@ -2028,11 +2018,14 @@ Semantic bridge between game code and cabinet IO over HoloCade UDP transport.
 
 Rendering/runtime system for 4-side (or optional 2-side) inward-facing cube displays with omni-parallax and omni-passthrough.
 
+**Service / diagnostics menu (Cube vs Cabinet):** Cube is a **reference layout**, not the only HoloCade cabinet. The **Cube** module should ship a **slightly specialized** operator diagnostics template versus **`HoloCade.Cabinet`**: assume **four** station-facing displays (N/S/E/W) and **audio routed with those displays** (four **matched** audio outputs, one per face — typical all-in-one or paired monitor stacks). Titles may use the **Cabinet** boilerplate **`CabinetDiagnosticsHost`** alone, or adopt / extend the **Cube** template when their rig matches this display+audio model (see Cabinet module — *Service / diagnostics menu*).
+
 **Primary Runtime Types:**
 - `CubeRigController` - procedural N/S/E/W side rig builder (cameras, portals, floor, frame)
 - `CubeSideCameraController` - per-side tracked camera controller with off-axis projection and mandatory oblique boundary clipping
 - `CubeRuntimeConfig` - ScriptableObject for cube dimensions, projection settings, tracking bounds, and visual materials
 - `CubeFaceTrackingProviderBase` - abstract provider contract for side-specific eye position input (MediaPipe integration target)
+- **Biometric consent (planned)** — legal gate before any eye-position tracking runs in production; see roadmap **v0.1.6 — Cube Module — Biometric data consent (eye-position tracking)**.
 - `CubePassthroughSources` - per-side feed texture assignments
 
 **Stereo Reprojection Pipeline (current scaffold):**
@@ -2070,14 +2063,9 @@ The Cube ships in two physical configurations and the SDK has to support both fr
 
 **The Editor never runs `MultiDisplayCabinet`.** Developers iterate on a single-monitor PC workstation, so editor play mode always runs against a `CubeRuntimeConfig` whose `displayMode = SingleDisplay`: all four side cameras render to Display 1, and per-station preview is achieved by enabling one camera at a time. There is no need (and no benefit) to retarget the Game window's Display dropdown in editor — the focused-camera approach handles preview entirely upstream of any display-routing logic. `MultiDisplayCabinet` is exclusively a **player-build** concern: the cabinet OS runs the standalone player against a `MultiDisplayCabinet` config, each side camera is pinned to its own physical monitor, and `Display.Activate()` brings the non-primary displays online at startup.
 
-**Tasks for v0.1.x:**
-- [x] Add `CubeDisplayMode` enum and `displayMode` / per-side display index fields to `CubeRuntimeConfig`.
-- [x] Procedurally assign `Camera.targetDisplay` in `CubeRigController.RebuildRig` so the cabinet mapping survives every rig rebuild.
-- [x] Activate non-primary `UnityEngine.Display` instances at startup in `MultiDisplayCabinet` mode (player builds only; no-op in editor).
-- [ ] Provide an SDK build pre-process script that lets a project select `SingleDisplay` vs `MultiDisplayCabinet` per build target without manually swapping config assets (low priority — current asset-swap workflow is fine for v0.1.x).
-- [ ] Add a HoloCade test scene + PlayMode test that flips the runtime config from `SingleDisplay` → `MultiDisplayCabinet` and asserts (a) all four side cameras have unique `targetDisplay` values, (b) `RebuildRig` reapplies them, (c) `Display.Activate` is called for every non-primary index referenced (player build smoke test, gated on `Application.isEditor == false`).
+Build automation and automated multi-display validation tests are **roadmap** work (see **v0.1.6 — Cube Module — Multi-display build hooks & QA**).
 
-#### Omni-Text Rendering (TMP slice active; 3D extruded variant planned)
+#### Omni-Text Rendering (TMP-backed; optional 3D backends)
 
 Cube games inherit a hard rule from the Cube's omnidirectional viewing geometry: **a single shared text mesh placed in the cube volume will always be facing away from at least one of the four players**. Any text that is meant to be readable from every station must therefore be rendered as **N independent oriented instances** (one per active station), each visible only to its own station camera. This is a Cube-wide concern (lobby/jumbotron, in-game HUD, post-match results, error/notice text, debug overlays, etc.), so the SDK owns the primitive rather than each title re-implementing it.
 
@@ -2129,50 +2117,9 @@ These avoid the default portal layers (`24..27`) and Unity's reserved layers (`0
 
 `CubeRuntimeConfig.enableOmniTextStationCulling` (default `true`) controls the subtractive mask logic in `CubeRigController.BuildCameraCullingMask`. When `true`, each side camera's mask is transformed so the three opposing-station OmniText layers are filtered out and the camera's own OmniText layer is included. When `false`, the per-station culling pass is skipped entirely (useful for diagnostic captures that want to see all four oriented instances at once).
 
-**Tasks (TMP-backed slice — **shipped** as the v0.1.1 unblocking gate):**
+**Shipped behavior (TMP):** A single logical **`OmniTextElement`** (`IOmniTextElement`) fans out to one **TextMeshPro** child per active station (`OmniText_<Side>`), each on the configured OmniText layer, with **fixed per-side yaw** (cardinals on local Y plus 180° by default so copy reads toward that station; **`flipFacing`** uses raw cardinals). **`localDepth`** (default 0) moves each shell along its own **local forward** (`localRotation * Vector3.forward`) by that many meters so copy can sit proud of embedded geometry (e.g. a jumbotron). Authored prefab children survive rig rebuilds; creating missing children requires both **`ICubeStationCameraSource`** and **`CubeRuntimeConfig`**. The component is **`[ExecuteAlways]`**; tests may inject sources via **`SetStationCameraSource`** / **`SetRuntimeConfig`**. Helpers: **`CubeRuntimeConfig.GetOmniTextLayerForSide`**, **`OmniTextStationLayers`**. Drop-in prefab: **`Runtime/Cube/CubeAssets/OmniText.prefab`**. EditMode coverage lives in **`HoloCade.Tests.Editor`** — add the package to **`manifest.json` → `testables`** so the Test Runner lists package tests (see **`Runtime/Cube/CUBE_MODULE_README.md`** for the full quickstart).
 
-- [x] Define a `HoloCade.Cube.IOmniTextElement` contract (`Runtime/Cube/OmniText/IOmniTextElement.cs`) that exposes the logical text/color/transform surface and a `Rebuild()` hook for post-rig-rebuild re-resolution.
-- [x] Add a `HoloCade.Cube.OmniTextElement` (`MonoBehaviour`, `Runtime/Cube/OmniText/OmniTextElement.cs`) that auto-discovers the scene's `CubeRigController` (parent walk first, scene-wide fallback second) and the rig's `RuntimeConfig`, then **finds or creates** one `TextMeshPro` child per active station (expected names `OmniText_<Side>`), parents new instances under its own transform, assigns each child to that side's OmniText layer when config is available, and applies a **fixed per-side yaw**: cardinals on local Y (`North` 0°, `East` 90°, `South` 180°, `West` 270°) **plus 180°** by default so TMP reads toward each station camera; **`flipFacing`** uses raw cardinals only (backwards from the station). Authored prefab children are **not** destroyed on Rebuild — content/layout sync runs on the same instances in Edit Mode and Play Mode. **Creating** a missing station child requires both `ICubeStationCameraSource` and `CubeRuntimeConfig` (for layers); updating existing children does not. Orientation does **not** track live camera transforms. Component is `[ExecuteAlways]`. Tests can inject a stub camera source via `SetStationCameraSource` / `SetRuntimeConfig`.
-- [x] Add per-station layer indices to `CubeRuntimeConfig` (`northOmniTextLayer`/`southOmniTextLayer`/`eastOmniTextLayer`/`westOmniTextLayer`, default `20..23`) and have `CubeRigController.BuildCameraCullingMask` apply the matching per-camera culling via `OmniTextStationLayers.ApplyStationCulling`. The transform is **subtractive** — non-OmniText bits in `sideCameraCullingMask` are preserved.
-- [x] Expose `CubeRuntimeConfig.GetOmniTextLayerForSide(CubeSide)` and the static helper `OmniTextStationLayers` (`LayerIndexForSide`, `UnionMask`, `ApplyStationCulling`) so titles and tests can do their own mask math without re-implementing it.
-- [x] Add EditMode unit coverage (`Tests/Editor/HoloCade.Tests.Editor.asmdef`) with `OmniTextStationLayersTests` (8 cases — pure layer math) and `OmniTextElementTests` (8 cases — per-station spawn, layer assignment, content propagation, idempotent rebuild, missing-config / missing-source guards).
-- [x] Ship drop-in prefab `Runtime/Cube/CubeAssets/OmniText.prefab` (TMP-backed `OmniTextElement` with authored font/material defaults). Instantiate under `[CubeBase]` or drag from the package Cube assets folder; add or generate `OmniText_<Side>` children for look-dev and save — Play Mode reuses those instances.
-
-**Tasks (3D extruded backend — planned, not blocking early cabinet titles on the TMP slice):**
-
-- [ ] `OmniText_Mesh3D.prefab` and matching backend implementing `IOmniTextElement` (see backend recommendation below).
-- [ ] PlayMode test that drops an `OmniText` prefab instance into the cube center and asserts: from each station camera, exactly one instance of the text element is rendered (other layers culled), and the visible instance's forward axis matches the fixed per-side yaw within tolerance. The EditMode tests above cover the layer-and-spawn invariants synthetically; the PlayMode test pairs it with a real `CubeRigController` rebuild + camera render frame.
-- [ ] Update the SDK examples / quick-start so any HoloCade title that needs Cube-visible text uses `OmniText` rather than placing a raw TMP/3D-text asset directly into the cube volume. Migrate existing samples that violate this rule.
-
-**Running the SDK tests from a consumer project:**
-
-The `HoloCade.Tests.Editor` asmdef lives inside the package, so the consumer's `Packages/manifest.json` must list the package as **testable** before Unity's Test Runner surfaces these tests:
-
-```json
-{
-  "dependencies": { "...": "..." },
-  "testables": [
-    "com.ajcampbell.holocade"
-  ]
-}
-```
-
-If you consume a forked package, use its `package.json` `name` in `testables` instead of `com.ajcampbell.holocade`.
-
-**Backend recommendation (3D extruded geometry text):**
-
-There is no clear universally-adopted free Unity plugin for 3D extruded geometry text. The realistic options are:
-
-- **Typogenic** (open-source, MIT) — SDF-based, fast, free, but archived in 2017; works with current Unity in practice but is unmaintained. Acceptable as the initial `OmniText_Mesh3D` backend if we accept maintenance risk.
-- **UnityTextDrawer** (open-source, MIT) — wraps TextMeshPro to draw 3D text with one call; not true extruded geometry, but a reasonable middle-ground if we only need depth/lighting on a TMP-style mesh.
-- **Dynamic 3D Text by Strobotnik** (paid Asset Store) — true runtime extruded TTF/OTF mesh generation with bevel and ligatures; the most feature-complete option for the jumbotron use case.
-- **3D Text Lite** (paid Asset Store, ~$15) — text-mesh generation utility, lighter feature set than Strobotnik.
-
-Default plan: ship `OmniText_Mesh3D` against **Typogenic** for the open-source baseline so the SDK has zero paid dependencies, but keep the `IOmniTextElement` backend selector open so titles that need higher fidelity can drop in **Dynamic 3D Text** without changing any call site. Re-evaluate if Typogenic breaks against a future Unity LTS.
-
-**Typical first integrations:**
-
-- Lobby jumbotron, center credit tally, per-quadrant ready badges, countdown digits, and other cube-visible HUD copy are the primary consumers of this primitive. The TMP-backed drop-in is **`Runtime/Cube/CubeAssets/OmniText.prefab`** (`OmniTextElement`). The 3D extruded backend is optional and can ship later without blocking cabinet credit / input flows.
+**Optional backends:** Additional **`IOmniTextElement`** implementations (e.g. 3D extruded / mesh-backed jumbotron text) are intentionally pluggable and are **not** required for credit, input, or lobby flows. Planned work is under the roadmap (**v0.1.6 — Cube Module — OmniText (optional 3D extruded backend)**).
 
 </blockquote>
 
@@ -3121,8 +3068,8 @@ This allows you to:
 
 HoloCade is designed for **commercial LBE installations** including:
 
-- 🎬 **Movie/TV Promotional Activations** (Comic-Con, CES, Sundance, Tribeca)
-- 🎮 **VR Arcades** with motion platforms
+- 🎬 **Film/TV Promotional Activations** (Comic-Con, CES, Sundance, Tribeca)
+- 🎮 **XR Arcades** with immersive tech to deliver unique gaming experiences
 - 🎪 **Theme Park Attractions** with custom haptics
 - 🎭 **Immersive Theater** with live actor-driven avatars
 - 🏢 **Corporate Events** and brand experiences
@@ -3888,19 +3835,30 @@ For any experience running one year or longer, HoloCade's author recommends cons
 
 #### Cube Module — Core Runtime Functionality
 
-- [x] **Drop-in Cube base workflow** - `CubeBase` prefab, `CubeRuntimeConfig`, and monitor catalog/spec assets documented and usable for rapid scene setup.
-- [x] **Procedural rig generation** - `CubeRigController` builds side roots/cameras, boundary portal quads, floor geometry, and frame primitives.
-- [x] **Per-side camera stack** - North/South/East/West side cameras generated and managed with side identity helpers (`CubeSide`).
-- [x] **Face tracking provider contract** - `CubeFaceTrackingProviderBase` and side-based eye-center input contract established for runtime integrations.
-- [x] **Tracking bounds and smoothing behavior** - `CubeSideCameraController` applies smoothing and out-of-bounds rejection to preserve stable side camera motion.
-- [x] **Off-axis frustum projection** - Asymmetric projection applied per frame for side-correct perspective updates from tracked eye positions.
-- [x] **Oblique near-plane clipping** - Side boundary-aligned clipping integrated as mandatory behavior for correct window semantics.
-- [x] **Virtual passthrough source plumbing** - `CubePassthroughSources` and rig-side portal texture application wired for per-side physical camera feeds.
-- [x] **Stereo frame contracts** - `CubeStereoFrame` + `CubeStereoFrameProviderBase` define left/right color/depth/confidence inputs with calibration transforms.
-- [x] **CPU reprojection baseline** - `CubeStereoCpuReprojectionPass` shipped as correctness reference and debugging fallback.
-- [x] **GPU reprojection path** - `CubeStereoReprojection.compute` + `CubeStereoGpuReprojectionPass` provide compute-based reprojection/compositing.
-- [x] **Portal debug visualization hooks** - scene debug options and frustum/frame visualization available for alignment and setup diagnostics.
-- [x] **2-player/4-player deployment contract** - Cube architecture documented to support full 4-side operation and reduced North/South-only deployment.
+- ✅ **Drop-in Cube base workflow** - `CubeBase` prefab, `CubeRuntimeConfig`, and monitor catalog/spec assets documented and usable for rapid scene setup.
+- ✅ **Procedural rig generation** - `CubeRigController` builds side roots/cameras, boundary portal quads, floor geometry, and frame primitives.
+- ✅ **Per-side camera stack** - North/South/East/West side cameras generated and managed with side identity helpers (`CubeSide`).
+- ✅ **Face tracking provider contract** - `CubeFaceTrackingProviderBase` and side-based eye-center input contract established for runtime integrations.
+- ✅ **Tracking bounds and smoothing behavior** - `CubeSideCameraController` applies smoothing and out-of-bounds rejection to preserve stable side camera motion.
+- ✅ **Off-axis frustum projection** - Asymmetric projection applied per frame for side-correct perspective updates from tracked eye positions.
+- ✅ **Oblique near-plane clipping** - Side boundary-aligned clipping integrated as mandatory behavior for correct window semantics.
+- ✅ **Virtual passthrough source plumbing** - `CubePassthroughSources` and rig-side portal texture application wired for per-side physical camera feeds.
+- ✅ **Stereo frame contracts** - `CubeStereoFrame` + `CubeStereoFrameProviderBase` define left/right color/depth/confidence inputs with calibration transforms.
+- ✅ **CPU reprojection baseline** - `CubeStereoCpuReprojectionPass` shipped as correctness reference and debugging fallback.
+- ✅ **GPU reprojection path** - `CubeStereoReprojection.compute` + `CubeStereoGpuReprojectionPass` provide compute-based reprojection/compositing.
+- ✅ **Portal debug visualization hooks** - scene debug options and frustum/frame visualization available for alignment and setup diagnostics.
+- ✅ **2-player/4-player deployment contract** - Cube architecture documented to support full 4-side operation and reduced North/South-only deployment.
+
+#### Cube Module — Multi-display cabinet routing (shipped)
+
+- ✅ **`CubeDisplayMode` + per-side display indices** on `CubeRuntimeConfig` (`SingleDisplay` vs `MultiDisplayCabinet`).
+- ✅ **Procedural `Camera.targetDisplay`** reassigned from `CubeRigController` on every `RebuildRig` (survives camera teardown).
+- ✅ **`Display.Activate()` for non-primary indices** in `MultiDisplayCabinet` **player builds** (no-op in Editor).
+
+#### Cube Module — Omni-text, TMP-backed (`IOmniTextElement`)
+
+- ✅ **`OmniTextElement`** fans out one TMP child per station with per-side OmniText layers and subtractive culling via `OmniTextStationLayers` / `CubeRuntimeConfig` layer fields.
+- ✅ **Drop-in prefab** `Runtime/Cube/CubeAssets/OmniText.prefab` and **EditMode tests** in `HoloCade.Tests.Editor` (`OmniTextStationLayersTests`, `OmniTextElementTests`).
 
 </blockquote>
 
@@ -3909,17 +3867,75 @@ For any experience running one year or longer, HoloCade's author recommends cons
 ### ✅ Current (v0.1.4) Pre-Alpha
 
 <details>
-<summary><strong>v0.1.4 (In-Progress)</strong></summary>
+<summary><strong>v0.1.4 (In-Progress) — Cabinet: Free Play & credit policy</strong></summary>
 
 <blockquote>
 
-### 🎯 Planned (v0.1.4 - In-Progress)
+### 🎯 v0.1.4 — Cabinet module (Free Play baseline shipped; polish remains)
+
+**Source of truth:** `ArcadeCabinetIOConfig.freePlayEnabled` only — no runtime `SetFreePlayOverride` (titles re-import or swap config assets / use editor on the asset).
+
+- ✅ **A1 — Config + bridge read path** — `ArcadeCabinetIOConfig.freePlayEnabled` + `ArcadeCabinetBridge.IsFreePlayEnabled`.
+- ✅ **A2 — (n/a)** — Runtime Free Play override **not** implemented by design; config asset is authoritative.
+- ✅ **A3 — Credit evaluation** — `CabinetCreditEvaluation.TryClaimCredit` + title `ICabinetPaidCreditPool` for paid pool visibility (no pool read in Free Play).
+- ✅ **A4 — Display mode enum** — `CabinetCreditDisplayMode` + `CabinetCreditClaimResult`.
+- ✅ **A7 — Automated tests** — EditMode coverage in `CabinetCreditEvaluationTests` (paid empty / paid with credits / Free Play).
+- ✅ **A8 — Title migration (HoloSnake)** — Interim `HoloSnake.Cabinet.*` stubs removed; lobby uses `HoloCade.Cabinet` evaluation + `CabinetPaidCreditPoolAdapter`.
+
+**Deferred past v0.1.4:** operator-menu UI + disk persistence for `freePlayEnabled`; time-window scheduling. Cabinet operator UI and related items live under **v0.1.5 — Cabinet: service / test menu** (**CabinetDiagnosticsHost** shell completion first, then credits / Free Play page, dev keyboard passthrough, HoloSnake operator persistence — see that milestone block below). **Gunship** and **Cube** ( **biometric consent before eye tracking**, CubeEmulator, equirect / sphere display, multi-display build hooks / QA, optional OmniText 3D backend) are scheduled under **v0.1.6** (see below).
+</blockquote>
+
+</details>
+
+<details>
+<summary><strong>v0.1.5 (In-Progress) — Cabinet: service / test menu</strong></summary>
+
+<blockquote>
+
+### 🎯 Planned (v0.1.5 - In-Progress)
+
+#### Cabinet module — Service / test menu
+
+> **Pattern reference:** Commercial arcade **operator test menus** commonly use a service button panel where **TEST** enters / confirms, **SERVICE** exits / cancels, **VOL+/−** move the highlight; a hierarchical **Main Menu** then branches into sections such as **Diagnostics**, **Pricing**, **Game Settings**, **System Settings**, **Audits**, **Resets**, **Volume**, **Calibration**, **Utilities**, and **System Information**. HoloCade implements the **shell + cabinet-wide pages**; titles register game-specific pages via **`CabinetDiagnosticsRegistry`**.  
+> **Cabinet vs Cube vs title:** **`Cabinet`** keeps this menu **generic** for **any** HoloCade cabinet topology (third-party rigs that may never use Cube). **`Cube`** adds a **slightly specialized** template (four displays + four matched integrated-monitor audio outputs). Each game team chooses **Cabinet boilerplate**, **Cube template**, or a **hybrid** (Cabinet shell + Cube-registered pages).  
+> **Scope note:** External operator PDFs are not text-extracted in this environment; the checklist below follows **section layouts and navigation idioms** typical of commercial arcade service documentation.
+
+- [ ] **`CabinetDiagnosticsHost` — service shell (scheduled)** — Promote the existing UI Toolkit host from scaffold to **operator-grade test menu**: service-mode entry (title / ECU contract TBD), **stacked navigation** (main list + submenus + back), optional QR / doc link hook, and section placeholders matching the manual outline (**Diagnostics**, **Pricing / credits**, **Game settings**, **System settings**, **Audits**, **Resets**, **Volume**, **Calibration**, **Utilities**, **System information**). Map cabinet **TEST** / **SERVICE** / volume buttons where `ArcadeCabinetIOConfig` exposes them; keep **F10** (or configurable) for editor dev entry until hardware path is finalized.
+- [ ] **Credits & Free Play (diagnostics page)** — First-class page under the host: live mode from **`ArcadeCabinetIOConfig`**, paid pool visibility, last credit-event timestamp, **Free Play** toggle (service-gated), persistence path as designed — still **no** `SetFreePlayOverride`; asset or documented swap remains authoritative.
+- [ ] **Editor keyboard passthrough for Free Play** — `KeyboardCabinetCreditSource` (or equivalent) so devs are not forced to spam swipe keys when Free Play is on; wire through diagnostics or editor-only host where appropriate.
+- [ ] **HoloSnake — Operator Free Play persistence (title)** — Persisted runtime operator toggle (title + SDK integration with the credits page above); until that page ships, toggle **`freePlayEnabled`** on **`ArcadeCabinetIOConfig`** in the inspector.
+- [ ] **Privacy / biometric notice (optional)** — Minimal **Privacy / biometrics** entry under the service host (venue policy link, “tracking paused” indicator). Full **player consent UI** is **v0.1.6 B2**; operator reset/status is **v0.1.6 B6**.
+
+</blockquote>
+
+</details>
+
+<details>
+<summary><strong>v0.1.6 (Planned) — Gunship; Cube (biometric consent, emulator, equirect / sphere, multi-display QA, OmniText 3D)</strong></summary>
+
+<blockquote>
+
+### 🎯 Planned (v0.1.6 - In-Progress)
+
+#### Cube Module — Biometric data consent (eye-position tracking)
+
+> **Compliance:** Cube parallax and passthrough depend on **eye-position / face-derived tracking** (cameras + `CubeFaceTrackingProviderBase`, including **HyperCube** pose ingest). Applicable law requires an explicit **biometric data permission** from each user **before** tracking begins. This group is a **hard gate** for production cabinets — implement in the SDK so every title inherits the same consent UX and runtime block, not per-game one-offs.
+
+- [ ] **B1 — Requirements & copy pack (SDK doc)** — Document legal/ops expectations for venue operators: when consent must be collected, what is disclosed (eye position, cameras, retention), jurisdiction notes (e.g. state biometric privacy laws), and **title-editable** consent strings (no legal advice in code — template + “consult counsel” banner in doc).
+- [ ] **B2 — Player-facing consent prompt** — UI flow shown **before the first tracking sample** each session (or stricter per-venue policy): clear accept/decline; **decline** path must leave the game playable in a **non-tracking fallback** (symmetric camera / last-known-safe mode per side) where technically feasible.
+- [ ] **B3 — Runtime tracking gate** — Central flag (e.g. `CubeBiometricConsentService` or config on `CubeRuntimeConfig`) that **`CubeSideCameraController`** and all **`CubeFaceTrackingProviderBase`** implementations (including **`HyperCubePoseTrackingProvider`**) consult: **no eye-position updates, no off-axis frustum drive from live tracking** until consent is true.
+- [ ] **B4 — HyperCube / vision PC alignment** — Define whether consent is **Windows-authoritative** (game PC blocks UDP pose consumption) with vision service idle until allowed; document handshake so Linux does not retain/process frames for tracking prior to consent if policy requires.
+- [ ] **B5 — Title integration contract** — Attract / Lobby hook guidance for titles (e.g. HoloSnake): consent before lobby camera parallax or before first `InGame` tick that enables tracking; expose events `OnBiometricConsentGranted` / `Declined` for UI flow.
+- [ ] **B6 — Operator / service menu (optional cross-link v0.1.5)** — Page or section under **`CabinetDiagnosticsHost`** for venue staff: open privacy policy URL, **reset session consent** (service-gated), show whether tracking is currently allowed (no PII dump).
+- [ ] **B7 — Editor / dev bypass** — Inspector or define-guarded bypass for **Editor Play Mode** and internal harness only; **stripped or hard-disabled** in release **MultiDisplayCabinet** builds.
+- [ ] **B8 — Automated tests** — EditMode tests: gate blocks `TryGetEyeCenterWorldPosition` / frustum updates when consent false; allows when true; decline does not crash attract loop.
+- [ ] **B9 — Module docs** — `Runtime/Cube/CUBE_MODULE_README.md` + root **`CubeModule_README.md`**: consent workflow, fallback behavior, and operator responsibilities.
 
 #### Gunship Experience — Alpha Readiness
 
 > **📋 Hardware Specifications:** See **[FirmwareExamples/GunshipExperience/Gunship_Hardware_Specs.md](FirmwareExamples/GunshipExperience/Gunship_Hardware_Specs.md)** for complete hardware specifications including solenoid selection, PWM driver modules, thermal management, redundancy, and communication architecture.
 
-- [x] **ESP32 Shield Design (Hardware)**
+- ✅ **ESP32 Shield Design (Hardware)**
   - **Example Shield Designs**: Design example shields/breakout boards for ESP32 plus needed modules for both ECU types:
     - **GunshipExperience_ECU**: ESP32 + Ethernet PHY (LAN8720A) + actuator control interfaces + scissor lift control interfaces
     - **Gun_ECU**: ESP32 + Ethernet PHY (LAN8720A) + dual thumb button inputs + N× solenoid PWM driver interfaces + NTC thermistor ADC inputs
@@ -3958,6 +3974,19 @@ For any experience running one year or longer, HoloCade's author recommends cons
 - [ ] **Procedural interior sphere (or four 90° segments / octants)** - Build mesh + UV layout in the Cube module so each incoming quadrant (or equirect layer) maps to the correct **UV region** for omni-passthrough on a sphere. Support **Editor Play Mode** and **builds** when enabled.
 - [ ] **Prefab integration** - Replace or switch from **temporary** portal + render-target setup in `CubeBase` to the sphere path behind a **clear toggle** or **pluggable display backend** so rectilinear loopback keeps working until stitch+comp ships.
 - [ ] **Doc + HyperCube cross-link** - Document the wire format / UV convention next to `HoloCade_HyperCube` milestones **v0.1.0** (stand-in 360 crops) and **v0.2.0+** (GPU equirect).
+
+#### Cube Module — Multi-display build hooks & QA
+
+- [ ] **Build pre-process hook** — Select `SingleDisplay` vs `MultiDisplayCabinet` per build target without manually swapping `CubeRuntimeConfig` assets (low priority while the two-asset workflow is acceptable).
+- [ ] **PlayMode smoke test** — HoloCade test scene + test that flips `SingleDisplay` → `MultiDisplayCabinet` and asserts: (a) all four side cameras have unique `targetDisplay` values, (b) `RebuildRig` reapplies them, (c) `Display.Activate` runs for every non-primary index referenced (**player build only**, gated on `Application.isEditor == false`).
+
+#### Cube Module — OmniText (optional 3D extruded backend)
+
+- [ ] **`OmniText_Mesh3D.prefab` + backend** — Second `IOmniTextElement` implementation for mesh / extruded-style jumbotron copy; keep backend **swappable** (open-source baseline preferred for zero paid SDK deps; paid generators acceptable per-title).
+- [ ] **PlayMode visibility test** — From each station camera, exactly one text instance visible (layers culled) and forward axis vs. fixed per-side yaw within tolerance, against a real `CubeRigController` rebuild + render frame.
+- [ ] **Samples + quick-start** — Migrate SDK examples that place raw TMP/3D text inside the cube volume to **`OmniText`**; extend **`Runtime/Cube/CUBE_MODULE_README.md`**.
+
+> **Backend options (planning):** No single community-standard extruded-text plugin; candidates include archived open-source SDF mesh generators, TMP-adjacent “3D draw” helpers, and paid Asset Store extrusion tools. Pick a default open-source path for the SDK package, document swap-in points for higher-fidelity titles, and re-evaluate per Unity LTS.
 
 </blockquote>
 
@@ -4030,8 +4059,8 @@ For any experience running one year or longer, HoloCade's author recommends cons
 - [ ] Apple Vision Pro support
 - [ ] **Holographic Render Target Support** - Support for holographic display technologies including swept-plane, swept-volume, Pepper's Ghost, lenticular, and other volumetric display methods. Enables rendering to specialized holographic hardware for immersive product visualization and LBE installations.
 - [ ] **ESP32 DMX Child ECU** - Battery-powered ESP32 Child ECU that receives Art-Net/sACN lighting data wirelessly and outputs standard DMX to fixtures. Designed for scenarios where fixtures must be suspended in air without cables. See `FirmwareExamples/Research/WirelessLighting.md` for design specification.
-- [x] **Universal Shield UART Debug Breakout** - ✅ **COMPLETE (v0.1.3)** - 4-pin header (GND, 3.3V, U0TXD, U0RXD) for serial debug interface, firmware programming, and UART-based module interfacing. Now available on Universal Shield. See the [Universal Shield PCB README](https://github.com/scifiuiguy/HoloCade_PCBs/blob/main/HoloCade_Universal_Shield/README.md) for pinout details.
-- [x] **Universal Shield DIP Switch Power Toggling** - ✅ **COMPLETE (v0.1.3)** - DIP switches (one per aux port) to manually enable/disable 5V power output on each aux port, plus Schottky diodes (MBR745) for backfeed protection. Prevents parallel power supply issues when connecting HCUS-to-HCUS and enables flexible power management. Now available on Universal Shield. See the [Universal Shield PCB README](https://github.com/scifiuiguy/HoloCade_PCBs/blob/main/HoloCade_Universal_Shield/README.md) for implementation details.
+- ✅ **Universal Shield UART Debug Breakout** - ✅ **COMPLETE (v0.1.3)** - 4-pin header (GND, 3.3V, U0TXD, U0RXD) for serial debug interface, firmware programming, and UART-based module interfacing. Now available on Universal Shield. See the [Universal Shield PCB README](https://github.com/scifiuiguy/HoloCade_PCBs/blob/main/HoloCade_Universal_Shield/README.md) for pinout details.
+- ✅ **Universal Shield DIP Switch Power Toggling** - ✅ **COMPLETE (v0.1.3)** - DIP switches (one per aux port) to manually enable/disable 5V power output on each aux port, plus Schottky diodes (MBR745) for backfeed protection. Prevents parallel power supply issues when connecting HCUS-to-HCUS and enables flexible power management. Now available on Universal Shield. See the [Universal Shield PCB README](https://github.com/scifiuiguy/HoloCade_PCBs/blob/main/HoloCade_Universal_Shield/README.md) for implementation details.
 - [ ] **Universal Shield Personality Adapters** - Design and manufacture adapter PCBs to enable Universal Shield support for ESP32-WROOM-32, Arduino Uno/Mega, and STM32 (Black Pill, Nucleo, etc.) MCU platforms. Adapters handle pin mapping, power regulation (Arduino), and level shifting (Arduino) to provide platform flexibility and cost optimization. See the [Universal Shield PCB README](https://github.com/scifiuiguy/HoloCade_PCBs/blob/main/HoloCade_Universal_Shield/README.md) for design specifications.
 - [ ] **Universal Shield Variants (Via vs. Header Mounting)** - Create three mounting variants of the Universal Shield: 1) Current via-mounted design (ESP32-S3 soldered directly), 2) 22-pin male headers variant (removable module), 3) 22-pin female headers variant (stackable configuration). Each variant maintains identical functionality but supports different installation requirements (permanent, removable, or stackable). See the [Universal Shield PCB README](https://github.com/scifiuiguy/HoloCade_PCBs/blob/main/HoloCade_Universal_Shield/README.md) for variant specifications.
 - [ ] **Universal Shield 4A Fuse for Aux Power Bus** - Add overcurrent protection (4A fuse) to the 5V aux power bus on Universal Shield. Fuse protects all 8 aux ports from excessive current draw, short circuits, and overcurrent conditions. Fuse rating matches maximum design capacity (4A total across 8 ports). Consider resettable fuse (polyfuse) for easier field maintenance. See the [Universal Shield PCB README](https://github.com/scifiuiguy/HoloCade_PCBs/blob/main/HoloCade_Universal_Shield/README.md) for implementation details.

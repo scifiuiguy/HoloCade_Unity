@@ -13,6 +13,8 @@ namespace HoloCade.Cube
     /// transform (typically named <c>OmniText_North</c>, etc.), is placed on its OmniText layer
     /// (per <see cref="CubeRuntimeConfig"/>), and uses a fixed per-side yaw (cardinals on local Y
     /// plus 180° by default; see <see cref="flipFacing"/>) so TMP reads toward that side's camera.
+    /// Optional <see cref="localDepth"/> offsets each shell along its own local +Z (after that yaw)
+    /// so quads can sit in front of embedded cabinet geometry.
     /// <see cref="CubeRigController"/> applies per-camera culling so each station camera only sees
     /// its own OmniText layer (<see cref="CubeRuntimeConfig.enableOmniTextStationCulling"/> must stay
     /// enabled for normal play). If station children remain on Default layer (0), every camera still
@@ -51,6 +53,12 @@ namespace HoloCade.Cube
         [Tooltip("Uniform local scale applied to each station child when syncing from this component. Live edits propagate via OnValidate / Rebuild.")]
         [Min(0.0001f)] [SerializeField] float stationLocalScale = 0.1f;
 
+        [Tooltip(
+            "Meters each station TMP shell moves along its own local +Z (after per-side yaw), i.e. along the quad’s forward / toward that station’s camera. " +
+            "Use positive values to pop copy out from embedded geometry (e.g. jumbotron). Negative values offset the opposite way (TMP faces local −Z by default). Zero keeps shells at their authored / default local origin.")]
+        [SerializeField]
+        float localDepth = 0.26f;
+
         [Header("Stations")]
         [Tooltip("Which station instances are active. Disabled sides deactivate their child object (if present) instead of deleting it.")]
         [SerializeField] bool showOnNorth = true;
@@ -77,6 +85,12 @@ namespace HoloCade.Cube
 
         readonly List<StationInstance> _instances = new List<StationInstance>(4);
         ICubeStationCameraSource _cameraSourceOverride;
+
+        /// <summary>Depth baked into hierarchy at the start of <see cref="Rebuild"/>; used to strip before re-applying <see cref="localDepth"/>.</summary>
+        float _stripDepthForRebuild;
+
+        /// <summary>Last <see cref="localDepth"/> committed to station transforms after a full rebuild.</summary>
+        float _lastAppliedLocalDepth;
 
         /// <summary>Play mode: re-apply OmniText layers for a few frames so ordering after Awake cannot leave station TMPs on Default.</summary>
         int _playModeLayerWarmupFramesRemaining = 32;
@@ -127,6 +141,21 @@ namespace HoloCade.Cube
             }
         }
 
+        /// <summary>
+        /// Per-station offset along each shell’s local forward (see <see cref="localDepth"/>). Changing this triggers <see cref="Rebuild"/>.
+        /// </summary>
+        public float LocalDepth
+        {
+            get => localDepth;
+            set
+            {
+                if (Mathf.Approximately(localDepth, value))
+                    return;
+                localDepth = value;
+                Rebuild();
+            }
+        }
+
         public Transform Transform => transform;
 
         public void SetStationCameraSource(ICubeStationCameraSource source)
@@ -169,38 +198,46 @@ namespace HoloCade.Cube
 
         public void Rebuild()
         {
-            if (!CanModifyHierarchyUnder(this))
+            _stripDepthForRebuild = _lastAppliedLocalDepth;
+            try
             {
+                if (!CanModifyHierarchyUnder(this))
+                {
+                    ResolveReferences();
+                    RefreshInstancesFromChildren();
+                    SyncStationVisibilityWithInspectorFlags();
+                    ApplyStationLayersFromConfig();
+                    ApplyContentAndLayoutToKnownInstances();
+                    return;
+                }
+
                 ResolveReferences();
-                RefreshInstancesFromChildren();
+                if (template != null)
+                    template.gameObject.SetActive(false);
+
+                _instances.Clear();
+
+                SyncSide(CubeSide.North, showOnNorth);
+                SyncSide(CubeSide.South, showOnSouth);
+                SyncSide(CubeSide.East, showOnEast);
+                SyncSide(CubeSide.West, showOnWest);
+
                 SyncStationVisibilityWithInspectorFlags();
                 ApplyStationLayersFromConfig();
+
+                // Push parent Content to shells after SyncSide (covers Text/Color set while _instances was empty,
+                // and keeps authored shells in sync when Rebuild runs after external IOmniTextElement writes).
                 ApplyContentAndLayoutToKnownInstances();
-                return;
-            }
-
-            ResolveReferences();
-            if (template != null)
-                template.gameObject.SetActive(false);
-
-            _instances.Clear();
-
-            SyncSide(CubeSide.North, showOnNorth);
-            SyncSide(CubeSide.South, showOnSouth);
-            SyncSide(CubeSide.East, showOnEast);
-            SyncSide(CubeSide.West, showOnWest);
-
-            SyncStationVisibilityWithInspectorFlags();
-            ApplyStationLayersFromConfig();
-
-            // Push parent Content to shells after SyncSide (covers Text/Color set while _instances was empty,
-            // and keeps authored shells in sync when Rebuild runs after external IOmniTextElement writes).
-            ApplyContentAndLayoutToKnownInstances();
 
 #if UNITY_EDITOR
-            if (!Application.isPlaying)
-                UnityEditor.SceneView.RepaintAll();
+                if (!Application.isPlaying)
+                    UnityEditor.SceneView.RepaintAll();
 #endif
+            }
+            finally
+            {
+                _lastAppliedLocalDepth = localDepth;
+            }
         }
 
         /// <summary>
@@ -367,12 +404,15 @@ namespace HoloCade.Cube
             TextMeshPro tmp;
             var createdNew = false;
 
+            Vector3 baseLocalPosition;
             if (tr != null)
             {
                 go = tr.gameObject;
                 tmp = go.GetComponent<TextMeshPro>();
                 if (tmp == null)
                     tmp = go.AddComponent<TextMeshPro>();
+                var prevRot = go.transform.localRotation;
+                baseLocalPosition = go.transform.localPosition - prevRot * Vector3.forward * _stripDepthForRebuild;
             }
             else
             {
@@ -383,15 +423,16 @@ namespace HoloCade.Cube
                 go.transform.SetParent(transform, false);
                 createdNew = true;
                 tmp = go.AddComponent<TextMeshPro>();
+                baseLocalPosition = Vector3.zero;
             }
 
             if (_runtimeConfig != null)
                 go.layer = _runtimeConfig.GetOmniTextLayerForSide(side);
 
-            go.transform.localRotation = Quaternion.Euler(0f, StationYawDegrees(side, flipFacing), 0f);
+            var stationRot = Quaternion.Euler(0f, StationYawDegrees(side, flipFacing), 0f);
+            go.transform.localRotation = stationRot;
             go.transform.localScale = Vector3.one * stationLocalScale;
-            if (createdNew)
-                go.transform.localPosition = Vector3.zero;
+            go.transform.localPosition = baseLocalPosition + stationRot * Vector3.forward * localDepth;
 
             if (ShouldDriveStationTmpContent(createdNew))
             {
@@ -402,6 +443,7 @@ namespace HoloCade.Cube
                 tmp.fontSize = fontSize;
                 if (font != null)
                     tmp.font = font;
+                tmp.ForceMeshUpdate(true);
             }
 
             ClearHideFlagsRecursive(go);
@@ -473,11 +515,12 @@ namespace HoloCade.Cube
                 var inst = _instances[i];
                 if (inst.Go == null || inst.Tmp == null)
                     continue;
+                var prevRot = inst.Go.transform.localRotation;
+                var baseLocalPosition = inst.Go.transform.localPosition - prevRot * Vector3.forward * _stripDepthForRebuild;
+                var stationRot = Quaternion.Euler(0f, StationYawDegrees(inst.Side, flipFacing), 0f);
+                inst.Go.transform.localRotation = stationRot;
                 inst.Go.transform.localScale = scaleVec;
-                inst.Go.transform.localRotation = Quaternion.Euler(
-                    0f,
-                    StationYawDegrees(inst.Side, flipFacing),
-                    0f);
+                inst.Go.transform.localPosition = baseLocalPosition + stationRot * Vector3.forward * localDepth;
                 if (ShouldDriveStationTmpContent(createdNewStationShell: false))
                 {
                     inst.Tmp.text = text;
@@ -486,17 +529,23 @@ namespace HoloCade.Cube
                     inst.Tmp.alignment = alignment;
                     if (font != null)
                         inst.Tmp.font = font;
+                    inst.Tmp.ForceMeshUpdate(true);
                 }
             }
         }
 
         void ApplyText()
         {
+            if (_instances.Count == 0)
+                RefreshInstancesFromChildren();
+
             for (var i = 0; i < _instances.Count; i++)
             {
                 var inst = _instances[i];
-                if (inst.Tmp != null)
-                    inst.Tmp.text = text;
+                if (inst.Tmp == null)
+                    continue;
+                inst.Tmp.text = text;
+                inst.Tmp.ForceMeshUpdate(true);
             }
         }
 

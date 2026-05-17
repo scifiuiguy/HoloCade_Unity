@@ -62,6 +62,9 @@ namespace HoloCade.Cabinet
 
         public ArcadeCabinetIOConfig CabinetConfiguration => cabinetConfig;
 
+        /// <summary>True when <see cref="ArcadeCabinetIOConfig.freePlayEnabled"/> is set on the active configuration asset.</summary>
+        public bool IsFreePlayEnabled => cabinetConfig != null && cabinetConfig.freePlayEnabled;
+
         public HoloCadeUDPTransport Transport => transport;
 
         void Awake()

@@ -184,6 +184,8 @@ Per side camera:
 
 Face tracking input is side-specific and provided through `CubeFaceTrackingProviderBase`.
 
+**Biometric consent (roadmap):** Production use of eye-position tracking requires a **player permission prompt before tracking starts** (legal requirement for biometric data in applicable jurisdictions). Planned SDK work: **README roadmap → v0.1.6 — Cube Module — Biometric data consent (eye-position tracking)** (`B1`–`B9`). Until shipped, do not enable live tracking on public-facing cabinets without venue-level legal clearance and a title-specific consent flow.
+
 Each side camera must:
 
 - consume tracked eye-center world position for its side

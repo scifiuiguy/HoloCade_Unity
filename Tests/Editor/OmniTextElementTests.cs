@@ -217,5 +217,37 @@ namespace HoloCade.Tests.Editor
                 Assert.AreEqual(expected, tmp.color);
             }
         }
+
+        [Test]
+        public void LocalDepth_OffsetsNorthShellAlongLocalForward()
+        {
+            var (element, _) = MakeElement(n: true, s: false, e: false, w: false);
+            const float depth = 0.25f;
+            element.LocalDepth = depth;
+
+            var north = element.transform.Find("OmniText_North");
+            Assert.IsNotNull(north);
+            var stationRot = Quaternion.Euler(0f, 180f, 0f);
+            var expected = stationRot * Vector3.forward * depth;
+            Assert.AreEqual(expected.x, north.localPosition.x, 0.001);
+            Assert.AreEqual(expected.y, north.localPosition.y, 0.001);
+            Assert.AreEqual(expected.z, north.localPosition.z, 0.001);
+        }
+
+        [Test]
+        public void LocalDepth_AllowsNegativeOffsetAlongLocalForward()
+        {
+            var (element, _) = MakeElement(n: true, s: false, e: false, w: false);
+            const float depth = -0.26f;
+            element.LocalDepth = depth;
+
+            var north = element.transform.Find("OmniText_North");
+            Assert.IsNotNull(north);
+            var stationRot = Quaternion.Euler(0f, 180f, 0f);
+            var expected = stationRot * Vector3.forward * depth;
+            Assert.AreEqual(expected.x, north.localPosition.x, 0.001);
+            Assert.AreEqual(expected.y, north.localPosition.y, 0.001);
+            Assert.AreEqual(expected.z, north.localPosition.z, 0.001);
+        }
     }
 }

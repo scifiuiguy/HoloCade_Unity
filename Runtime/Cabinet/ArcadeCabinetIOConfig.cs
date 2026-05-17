@@ -17,6 +17,9 @@ namespace HoloCade.Cabinet
         [Tooltip("When true, coin/card inputs are shared cabinet-wide (playerSlotIndex = -1 packets). When false, credit packets are sent per player slot index.")]
         public bool sharedCreditInputs = true;
 
+        [Tooltip("When true, cabinet credit policy treats the rig as Free Play: Start presses do not require a paid credit pool (titles should hide numeric credit UI and skip pool decrements). Source of truth is this asset only — no runtime override.")]
+        public bool freePlayEnabled;
+
         [Tooltip("HoloCade logical channel for packets from the ECU to the game build (ECU → game engine). Incoming cabinet/sensor data uses this channel. Payload: messageType + playerSlotIndex + body.")]
         public int inputPacketChannel = 40;
 
